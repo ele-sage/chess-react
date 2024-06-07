@@ -14,6 +14,9 @@ prune:
 	docker system prune --all --volumes
 
 frontend:
-	docker exec -it frontend sh
+	docker exec -it chess-frontend-1 sh
 
-.PHONY: start stop prune frontend
+backend:
+	docker exec -it chess-backend-1 bash
+
+.PHONY: start stop prune frontend backend

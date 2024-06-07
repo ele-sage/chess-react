@@ -2,19 +2,31 @@ version: '3.9'
 
 # Dev
 services:
-  frontend:
-    build:
-      context: ./frontend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=development
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #   volumes:
+  #     - ./frontend/react:/app/react
+  #     - /app/react/node_modules
+  #   ports:
+  #     - "443:443"
+  #     - "80:80"
+  #   environment:
+  #     - NODE_ENV=development
+  #   networks:
+  #     - default_network
 
-# volumes:
-#   static:
+  backend:
+    build:
+      context: ./backend
+    volumes:
+      - ./backend/src:/app/src
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - default_network
 
 networks:
   default_network:
