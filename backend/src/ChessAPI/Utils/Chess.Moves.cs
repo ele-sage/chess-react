@@ -1,26 +1,25 @@
 namespace ChessAPI
 {
+// Chess.Moves.cs
 public partial class Chess
 {
-    private Dictionary<string, List<string>> _whiteMoves = new();
-    private Dictionary<string, List<string>> _blackMoves = new();
+    private Dictionary<string, List<string>> _whiteMoves = [];
+    private Dictionary<string, List<string>> _blackMoves = [];
 
     private ulong GeneratePawnMoves(ulong bitboard, bool isWhite, int constraint)
     {
         ulong moves = 0UL;
-        ulong singleStep = 0UL;
+        int color = isWhite ? 0 : 1;
 
         if (!_coverageSet)
-        {
-            ulong enemyMask = (isWhite ? _blackBitboard : _whiteBitboard);
-            return (isWhite ? (NorthEast(bitboard) | NorthWest(bitboard)) & ~enemyMask : (SouthEast(bitboard) | SouthWest(bitboard)) & ~enemyMask);
-        }
+            return isWhite ? (NorthEast(bitboard) | NorthWest(bitboard)) & ~_fullBitboard[color ^ 1] : (SouthEast(bitboard) | SouthWest(bitboard)) & ~_fullBitboard[color ^ 1];
         if (constraint == 0 || constraint == 1)
         {
-            moves |= singleStep = (isWhite ? North(bitboard) & _emptyBitboard : South(bitboard) & _emptyBitboard);
-            moves |= (isWhite ? North(singleStep) & _emptyBitboard & RankMasks[3] : South(singleStep) & _emptyBitboard & RankMasks[4]);
+            ulong singleStep;
+            moves |= singleStep = isWhite ? North(bitboard) & _emptyBitboard : South(bitboard) & _emptyBitboard;
+            moves |= isWhite ? North(singleStep) & _emptyBitboard & RankMasks[3] : South(singleStep) & _emptyBitboard & RankMasks[4];
             if (constraint == 0)
-                moves |= (isWhite ? (NorthEast(bitboard) | NorthWest(bitboard)) & (_blackBitboard | _enPassantMask) : (SouthEast(bitboard) | SouthWest(bitboard)) & (_whiteBitboard | _enPassantMask));
+                moves |= isWhite ? (NorthEast(bitboard) | NorthWest(bitboard)) & (_fullBitboard[1] | _enPassantMask) : (SouthEast(bitboard) | SouthWest(bitboard)) & (_fullBitboard[0] | _enPassantMask);
         }
 
         return moves;
@@ -31,18 +30,18 @@ public partial class Chess
         if (!_coverageSet)
             isWhite = !isWhite;
         ulong moves = 0UL;
-        ulong enemyMask = (isWhite ? _blackBitboard : _whiteBitboard);
+        int   color = isWhite ?  0 : 1;
 
         if (constraint != 0)
             return moves;
 
-        ulong[] knightMoves = {
+        ulong[] knightMoves = [
             KnightNE(bitboard), KnightNW(bitboard), KnightSE(bitboard), KnightSW(bitboard),
             KnightEN(bitboard), KnightES(bitboard), KnightWN(bitboard), KnightWS(bitboard)
-        };
+        ];
 
         foreach (var move in knightMoves)
-            if ((move & (_emptyBitboard | enemyMask)) != 0)
+            if ((move & (_emptyBitboard | _fullBitboard[color ^ 1])) != 0)
                 moves |= move;
 
         return moves;
@@ -53,7 +52,7 @@ public partial class Chess
         if (!_coverageSet)
             isWhite = !isWhite;
         ulong moves = 0UL;
-        ulong enemyMask = (isWhite ? _blackBitboard : _whiteBitboard);
+        int   color = isWhite ?  0 : 1;
 
         for (int i = start; i < finish; i++)
         {
@@ -65,7 +64,7 @@ public partial class Chess
                 moves |= direction;
                 direction = QueenDirections[i](direction);
             }
-            if ((direction & enemyMask) != 0)
+            if ((direction & _fullBitboard[color ^ 1]) != 0)
                 moves |= direction;
         }
 
@@ -104,8 +103,8 @@ public partial class Chess
     private ulong GenerateKingMoves(ulong bitboard, bool isWhite, int constraint)
     {
         ulong moves = 0UL;
-        ulong enemyMask = (isWhite ? _blackBitboard : _whiteBitboard);
-        ulong enemyMaskCoverage = (_coverageSet ? (isWhite ? _blackCoverage : _whiteCoverage) : 0UL);
+        int   color = isWhite ?  0 : 1;
+        ulong enemyMaskCoverage = _coverageSet ? _pieceCoverage[color ^ 1] : 0UL;
 
         ulong[] kingMoves = {
             North(bitboard), South(bitboard), East(bitboard), West(bitboard),
@@ -113,35 +112,65 @@ public partial class Chess
         };
 
         foreach (var move in kingMoves)
-            if ((move & (_emptyBitboard | enemyMask) & ~enemyMaskCoverage) != 0)
+            if ((move & (_emptyBitboard | _fullBitboard[color ^ 1]) & ~enemyMaskCoverage) != 0)
                 moves |= move;
         return moves;
     }
 
     private int AxisConstraint(ulong pieceBitboard, bool isWhite)
     {
-        if ((pieceBitboard & (isWhite ? _whitePinned : _blackPinned)) != 0)
+        int color = isWhite ?  0 : 1;
+        
+        if ((pieceBitboard & _pinnedToKing[color]) != 0)
         {
-            if ((pieceBitboard & (isWhite ? _bitboards[Piece['N']] : _bitboards[Piece['n']])) != 0)
+            if ((pieceBitboard & (isWhite ? _bitboards['N'] : _bitboards['n'])) != 0)
                 return 1;
-            int[] kingPos = (isWhite ? _whiteKingPos : _blackKingPos);
 
-            PrintBitBoard(pieceBitboard);
-            if ((FileMasks[kingPos[0]] & pieceBitboard) != 0)
+            if ((FileMasks[_kingPos[color,0]] & pieceBitboard) != 0)
                 return 1;
-            else if ((RankMasks[kingPos[1]] & pieceBitboard) != 0)
+            else if ((RankMasks[_kingPos[color,1]] & pieceBitboard) != 0)
                 return 3;
             else 
             {
                 int[] piecePos = BitboardToCoord(pieceBitboard);
 
-                if ((piecePos[0] - piecePos[1]) == (kingPos[0] - kingPos[1]))
+                if ((piecePos[0] - piecePos[1]) == (_kingPos[color,0] - _kingPos[color,1]))
                     return 5;
-                if ((piecePos[0] + piecePos[1]) == (kingPos[0] + kingPos[1]))
+                if ((piecePos[0] + piecePos[1]) == (_kingPos[color,0] + _kingPos[color,1]))
                     return 7;
             }
         }
         return 0;
+    }
+
+    private bool IsCheck(ulong bitboard, bool isWhite)
+    {
+        int   color = isWhite ?  0 : 1;
+        
+        ulong[] knightMoves = [
+            KnightNE(bitboard), KnightNW(bitboard), KnightSE(bitboard), KnightSW(bitboard),
+            KnightEN(bitboard), KnightES(bitboard), KnightWN(bitboard), KnightWS(bitboard)
+        ];
+        foreach (var move in knightMoves)
+        {
+            Console.WriteLine(PieceSymbols[((color ^ 1) * 5) + 1]);
+            if ((move & (_emptyBitboard | _fullBitboard[PieceSymbols[((color ^ 1) * 5) + 1]])) != 0)
+                return true;
+        }
+        for (int i = 0; i < 8; i++)
+        {
+            ulong direction = QueenDirections[i](bitboard);
+
+            while ((direction & _emptyBitboard) != 0)
+            {
+                direction &= _emptyBitboard;
+                direction = QueenDirections[i](direction);
+            }
+            if ((direction & (_fullBitboard[PieceSymbols[((color ^ 1) * 5) + 4]] | _fullBitboard[PieceSymbols[((color ^ 1) * 5) + (i % 4) + 2]])) != 0)
+                return true;
+        }
+
+        return false;
     }
 
     public void GetAllMovesForPiece(char piece)
@@ -151,7 +180,7 @@ public partial class Chess
 
         if (_moveGenerators.TryGetValue(pieceKey, out var generateMoves))
         {
-            ulong piecesMask = _bitboards[Piece[piece]];
+            ulong piecesMask = _bitboards[piece];
             while (piecesMask != 0)
             {
                 ulong pieceBitboard = piecesMask & ~(piecesMask - 1);

@@ -2,6 +2,7 @@ using System.Numerics;
 
 namespace ChessAPI
 {
+// Chess.Utils.cs
 public partial class Chess
 {
     public static ulong FileRankToMask(string fileRank)
@@ -62,7 +63,6 @@ public partial class Chess
     public void GetFenFromBitboard()
     {
         string fen = "";
-        char[] pieceSymbols = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
         int index = 0;
 
         for (int i = 0; i < 64; i++)
@@ -76,11 +76,11 @@ public partial class Chess
             }
             char piece = '.';
             ulong squareMask = 1UL << i;
-            for (int j = 0; j < _bitboards.Length; j++)
+            for (int j = 0; j < PieceSymbols.Length; j++)
             {
-                if ((_bitboards[j] & squareMask) != 0)
+                if ((_bitboards[PieceSymbols[j]] & squareMask) != 0)
                 {
-                    piece = pieceSymbols[j];
+                    piece = PieceSymbols[j];
                     break;
                 }
             }
@@ -115,9 +115,7 @@ public partial class Chess
     
     public void PrintAllAccessibleSquares()
     {
-        char[] pieceSymbols = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
-        
-        foreach (char piece in pieceSymbols)
+        foreach (char piece in PieceSymbols)
             GetAllMovesForPiece(piece);
 
         Console.WriteLine("\nWhite Pieces:");
@@ -134,12 +132,14 @@ public partial class Chess
             List<string> value = moves.Value;
             Console.WriteLine($"{key}: [{string.Join(", ", value)}]");
         }
+        Console.Write("\nWhite king check? ");
+        Console.WriteLine(IsCheck(_bitboards['K'], true));
+        Console.Write("\nBlack king check?");
+        Console.WriteLine(IsCheck(_bitboards['k'], false));
     }
     
     public void PrintBoard()
     {
-        char[] pieceSymbols = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
-
         for (int rank = 0; rank < Size; rank++)
         {
             string row = $"{Size - rank} ";
@@ -148,11 +148,11 @@ public partial class Chess
                 ulong squareMask = 1UL << (rank * Size + file);
                 char piece = '.';
 
-                for (int i = 0; i < _bitboards.Length; i++)
+                for (int i = 0; i < PieceSymbols.Length; i++)
                 {
-                    if ((_bitboards[i] & squareMask) != 0)
+                    if ((_bitboards[PieceSymbols[i]] & squareMask) != 0)
                     {
-                        piece = pieceSymbols[i];
+                        piece = PieceSymbols[i];
                         break;
                     }
                 }

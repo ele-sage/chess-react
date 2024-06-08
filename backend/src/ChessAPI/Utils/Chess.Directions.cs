@@ -1,5 +1,6 @@
 namespace ChessAPI
 {
+// Chess.Directions.cs
 public partial class Chess
 {
     private static ulong North(ulong bitboard) => bitboard >> Size;
@@ -12,20 +13,20 @@ public partial class Chess
     private static ulong SouthWest(ulong bitboard) => (bitboard << Size - 1) & ~FileMasks[Size - 1];
 
     private static readonly Func<ulong, ulong>[] RookDirections = 
-    {
-        bitboard => North(bitboard),
-        bitboard => South(bitboard),
-        bitboard => East(bitboard),
-        bitboard => West(bitboard)
-    };
+    [
+        North,
+        South,
+        East,
+        West
+    ];
     private static readonly Func<ulong, ulong>[] BishopDirections = 
-    {
-        bitboard => NorthEast(bitboard),
-        bitboard => SouthWest(bitboard),
-        bitboard => NorthWest(bitboard),
-        bitboard => SouthEast(bitboard)
-    };
-    private static readonly Func<ulong, ulong>[] QueenDirections = RookDirections.Concat(BishopDirections).ToArray();
+    [
+        NorthEast,
+        SouthWest,
+        NorthWest,
+        SouthEast
+    ];
+    private static readonly Func<ulong, ulong>[] QueenDirections = [.. BishopDirections, .. RookDirections];
 
     // Knight moves
     private static ulong KnightNE(ulong bitboard) => (bitboard >> 17) & 0x7F7F7F7F7F7F7F7F;
