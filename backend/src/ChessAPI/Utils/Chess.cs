@@ -30,22 +30,23 @@ public partial class Chess
     ];
 
     private Dictionary<char, ulong> _bitboards;
-    private ulong[]         _fullBitboard;
-    private ulong[]         _pinnedToKing;
-    private ulong[]         _pieceCoverage;
-    private int[,]          _kingPos;
+    private ulong[]         _fullBitboard = [0UL, 0UL];
+    private ulong[]         _pinnedToKing = [0UL, 0UL];
+    private ulong[]         _pieceCoverage = [0UL, 0UL];
+    private ulong[]         _pieceAttack = [0UL, 0UL];
+    private Dictionary<ulong, ulong>[] _checkBy = [[], []];
+    private int[,]          _kingPos = {{0,0}, {0,0}};
     private ulong           _emptyBitboard;
     private ulong           _enPassantMask;
 
-    private bool            _coverageSet;
     private readonly string _fen;
     private char            _turn;
-    private string          _castle;
+    private bool[,]         _castle = {{false,false}, {false,false}};
     private string          _enPassant;
     private int             _halfmove; // The halfmove clock specifies a decimal number of half moves with respect to the 50 move draw rule. It is reset to zero after a capture or a pawn move and incremented otherwise.
     private int             _fullmove;
 
-    private readonly Dictionary<char, Func<ulong, bool, int, ulong>> _moveGenerators;
+    private readonly Dictionary<char, Func<ulong, int, bool, int, ulong>> _moveGenerators;
 
     public Chess(string fen = Fen)
     {
@@ -54,14 +55,8 @@ public partial class Chess
             {'P', 0UL}, {'N', 0UL}, {'B', 0UL}, {'R', 0UL}, {'Q', 0UL}, {'K', 0UL},
             {'p', 0UL}, {'n', 0UL}, {'b', 0UL}, {'r', 0UL}, {'q', 0UL}, {'k', 0UL}
         };
-        _fullBitboard = new ulong[2];
-        _pieceCoverage = new ulong[2];
-        _pinnedToKing = new ulong[2];
-        _kingPos = new int [2,2];
-        _coverageSet = false;
-        _fen = fen;
+        _fen = fen == "" ? Fen : fen;
         _turn = 'w';
-        _castle = "";
         _enPassant = "";
         _halfmove = 0;
         _fullmove = 0;
@@ -70,7 +65,7 @@ public partial class Chess
         _fullBitboard[1] = _bitboards['p'] | _bitboards['n'] | _bitboards['b'] | _bitboards['r'] | _bitboards['q'] | _bitboards['k'];
         _emptyBitboard = ~(_fullBitboard[0] | _fullBitboard[1]);
 
-        _moveGenerators = new Dictionary<char, Func<ulong, bool, int, ulong>>
+        _moveGenerators = new Dictionary<char, Func<ulong, int, bool, int, ulong>>
         {
             {'p', GeneratePawnMoves},
             {'n', GenerateKnightMoves},
@@ -81,10 +76,8 @@ public partial class Chess
         };
         _pinnedToKing[0] = PinnedToKing('w', RookDirections) | PinnedToKing('w', BishopDirections);
         _pinnedToKing[1] = PinnedToKing('b', RookDirections) | PinnedToKing('b', BishopDirections);
-        setKingPos();
-        _pieceCoverage[0] = GetCoverage(true);
-        _pieceCoverage[1] = GetCoverage(false);
-        _coverageSet = true;
+        SetKingPos();
+        FirstCoverage();
     }
 
     private void InitializeBoard()
@@ -106,8 +99,33 @@ public partial class Chess
 
         // Castling Rights
         i += 2;
-        while (i < _fen.Length && _fen[i] != ' ')
-            _castle += _fen[i++];
+        if (_fen[i] == '-')
+            i++;
+        else
+        {
+            if (_fen[i] == 'K')
+            {
+                i++;
+                _castle [0,0] = true;
+            }
+            if (_fen[i] == 'Q')
+            {
+                i++;
+                _castle [0,1] = true;
+            }
+            if (_fen[i] == 'k')
+            {
+                i++;
+                _castle [1,0] = true;
+            }
+            if (_fen[i] == 'q')
+            {
+                i++;
+                _castle [1,1] = true;
+            }
+        }
+
+
 
         // Possible En Passant Target Mask
         j = ++i;
@@ -166,19 +184,52 @@ public partial class Chess
         return pinnedMask;
     }
 
-    private ulong GetCoverage(bool isWhite)
+    private void SetCoverage(int color)
     {
-        ulong   enemyMaskCoverage = 0UL;
-        char[]  pieces = isWhite ? ['P', 'N', 'B', 'R', 'Q', 'K'] : ['p', 'n', 'b', 'r', 'q', 'k'];
+        char[]  pieces = color == 0 ? ['P', 'N', 'B', 'R', 'Q', 'K'] : ['p', 'n', 'b', 'r', 'q', 'k'];
+        _pieceCoverage[color] = 0UL;
         
-        for (int i = 0; i < pieces.Length; i++)
+        for (int i = 0; i < pieces.Length - 1; i++)
             if (_moveGenerators.TryGetValue(char.ToLower(pieces[i]), out var generateMoves))
-                enemyMaskCoverage |= generateMoves(_bitboards[pieces[i]], isWhite, 0);
+                _pieceCoverage[color] |= generateMoves(_bitboards[pieces[i]], color, true, 0);
 
-        return enemyMaskCoverage;
+
+        ulong whiteKingAdjancent = North(_bitboards[PieceSymbols[5]]) | South(_bitboards[PieceSymbols[5]]) | East(_bitboards[PieceSymbols[5]]) | West(_bitboards[PieceSymbols[5]]) | NorthEast(_bitboards[PieceSymbols[5]]) | NorthWest(_bitboards[PieceSymbols[5]]) | SouthEast(_bitboards[PieceSymbols[5]]) | SouthWest(_bitboards[PieceSymbols[5]]);
+        ulong blackKingAdjancent = North(_bitboards[PieceSymbols[11]]) | South(_bitboards[PieceSymbols[11]]) | East(_bitboards[PieceSymbols[11]]) | West(_bitboards[PieceSymbols[11]]) | NorthEast(_bitboards[PieceSymbols[11]]) | NorthWest(_bitboards[PieceSymbols[11]]) | SouthEast(_bitboards[PieceSymbols[11]]) | SouthWest(_bitboards[PieceSymbols[11]]);
+
+        _pieceCoverage[0] |= whiteKingAdjancent & ~_fullBitboard[1];
+        _pieceCoverage[1] |= blackKingAdjancent & ~_fullBitboard[0];
+
+        _pieceAttack[0] |= whiteKingAdjancent & _fullBitboard[1] & ~_pieceCoverage[1];
+        _pieceAttack[1] |= blackKingAdjancent & _fullBitboard[0] & ~_pieceCoverage[0];
     }
 
-    private void setKingPos()
+    private void FirstCoverage()
+    {
+        int color = 0;
+        char[]  pieces = ['P', 'N', 'B', 'R', 'Q', 'p', 'n', 'b', 'r', 'q'];
+        _pieceCoverage[0] = 0UL;
+        _pieceCoverage[1] = 0UL;
+
+        for (int i = 0; i < pieces.Length; i++)
+        {
+            if (i == 5)
+                color = 1;
+            if (_moveGenerators.TryGetValue(char.ToLower(pieces[i]), out var generateMoves))
+                _pieceCoverage[color] |= generateMoves(_bitboards[pieces[i]], color, true, 0);
+        }
+
+        ulong whiteKingAdjancent = North(_bitboards[PieceSymbols[5]]) | South(_bitboards[PieceSymbols[5]]) | East(_bitboards[PieceSymbols[5]]) | West(_bitboards[PieceSymbols[5]]) | NorthEast(_bitboards[PieceSymbols[5]]) | NorthWest(_bitboards[PieceSymbols[5]]) | SouthEast(_bitboards[PieceSymbols[5]]) | SouthWest(_bitboards[PieceSymbols[5]]);
+        ulong blackKingAdjancent = North(_bitboards[PieceSymbols[11]]) | South(_bitboards[PieceSymbols[11]]) | East(_bitboards[PieceSymbols[11]]) | West(_bitboards[PieceSymbols[11]]) | NorthEast(_bitboards[PieceSymbols[11]]) | NorthWest(_bitboards[PieceSymbols[11]]) | SouthEast(_bitboards[PieceSymbols[11]]) | SouthWest(_bitboards[PieceSymbols[11]]);
+
+        _pieceCoverage[0] |= whiteKingAdjancent & ~_fullBitboard[1];
+        _pieceCoverage[1] |= blackKingAdjancent & ~_fullBitboard[0];
+
+        _pieceAttack[0] |= whiteKingAdjancent & _fullBitboard[1] & ~_pieceCoverage[1];
+        _pieceAttack[1] |= blackKingAdjancent & _fullBitboard[0] & ~_pieceCoverage[0];
+    }
+
+    private void SetKingPos()
     {
         int[] whiteKingPos = BitboardToCoord(_bitboards['K']);
         int[] blackKingPos = BitboardToCoord(_bitboards['k']);

@@ -1,129 +1,128 @@
+using System.Drawing;
+using System.Numerics;
+
 namespace ChessAPI
 {
 // Chess.Moves.cs
 public partial class Chess
 {
-    private Dictionary<string, List<string>> _whiteMoves = [];
-    private Dictionary<string, List<string>> _blackMoves = [];
+    private Dictionary<string, List<string>>[] _moves = [[], []];
+    private Dictionary<ulong, ulong>[] _movesBitboard = [[], []];
 
-    private ulong GeneratePawnMoves(ulong bitboard, bool isWhite, int constraint)
+    private ulong GeneratePawnMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         ulong moves = 0UL;
-        int color = isWhite ? 0 : 1;
-
-        if (!_coverageSet)
-            return isWhite ? (NorthEast(bitboard) | NorthWest(bitboard)) & ~_fullBitboard[color ^ 1] : (SouthEast(bitboard) | SouthWest(bitboard)) & ~_fullBitboard[color ^ 1];
+        if (isCoverage)
+        {
+            _pieceAttack[color]  |= color == 0 ? (NorthEast(bitboard) | NorthWest(bitboard)) & (_fullBitboard[1] | _enPassantMask) : (SouthEast(bitboard) | SouthWest(bitboard)) & (_fullBitboard[0] | _enPassantMask);
+            return color == 0 ? (NorthEast(bitboard) | NorthWest(bitboard)) & ~_fullBitboard[color ^ 1] : (SouthEast(bitboard) | SouthWest(bitboard)) & ~_fullBitboard[color ^ 1];
+        }
         if (constraint == 0 || constraint == 1)
         {
             ulong singleStep;
-            moves |= singleStep = isWhite ? North(bitboard) & _emptyBitboard : South(bitboard) & _emptyBitboard;
-            moves |= isWhite ? North(singleStep) & _emptyBitboard & RankMasks[3] : South(singleStep) & _emptyBitboard & RankMasks[4];
+            moves |= singleStep = color == 0 ? North(bitboard) & _emptyBitboard : South(bitboard) & _emptyBitboard;
+            moves |= color == 0 ? North(singleStep) & _emptyBitboard & RankMasks[3] : South(singleStep) & _emptyBitboard & RankMasks[4];
             if (constraint == 0)
-                moves |= isWhite ? (NorthEast(bitboard) | NorthWest(bitboard)) & (_fullBitboard[1] | _enPassantMask) : (SouthEast(bitboard) | SouthWest(bitboard)) & (_fullBitboard[0] | _enPassantMask);
+                moves |= color == 0 ? (NorthEast(bitboard) | NorthWest(bitboard)) & (_fullBitboard[1] | _enPassantMask) : (SouthEast(bitboard) | SouthWest(bitboard)) & (_fullBitboard[0] | _enPassantMask);
         }
 
         return moves;
     }
 
-    private ulong GenerateKnightMoves(ulong bitboard, bool isWhite, int constraint)
+    private ulong GenerateKnightMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
-        if (!_coverageSet)
-            isWhite = !isWhite;
-        ulong moves = 0UL;
-        int   color = isWhite ?  0 : 1;
-
         if (constraint != 0)
-            return moves;
+            return 0UL;
 
-        ulong[] knightMoves = [
-            KnightNE(bitboard), KnightNW(bitboard), KnightSE(bitboard), KnightSW(bitboard),
-            KnightEN(bitboard), KnightES(bitboard), KnightWN(bitboard), KnightWS(bitboard)
-        ];
+        ulong knightMoves = KnightNE(bitboard) | KnightNW(bitboard) | KnightSE(bitboard) | KnightSW(bitboard) | KnightEN(bitboard) | KnightES(bitboard) | KnightWN(bitboard) | KnightWS(bitboard);
 
-        foreach (var move in knightMoves)
-            if ((move & (_emptyBitboard | _fullBitboard[color ^ 1])) != 0)
-                moves |= move;
+        if (isCoverage)
+            _pieceAttack[color] |= knightMoves & _fullBitboard[color ^ 1];
+        knightMoves &= _emptyBitboard | _fullBitboard[color ^ 1];
 
-        return moves;
+        return knightMoves;
     }
 
-    private ulong IterDir(ulong bitboard, bool isWhite, int start, int finish)
+    private ulong IterDir(ulong bitboard, int color, bool isCoverage, int start, int finish)
     {
-        if (!_coverageSet)
-            isWhite = !isWhite;
         ulong moves = 0UL;
-        int   color = isWhite ?  0 : 1;
 
         for (int i = start; i < finish; i++)
         {
             ulong direction = QueenDirections[i](bitboard);
-
-            while ((direction & _emptyBitboard) != 0)
+            if (isCoverage)
             {
-                direction &= _emptyBitboard;
-                moves |= direction;
-                direction = QueenDirections[i](direction);
+                while (direction > 0)
+                {
+                    moves |= direction & _fullBitboard[color];
+                    _pieceAttack[color] |= direction & _fullBitboard[color ^ 1];
+                    direction &= _emptyBitboard;
+                    moves |= direction;
+                    direction = QueenDirections[i](direction);
+                }
             }
-            if ((direction & _fullBitboard[color ^ 1]) != 0)
-                moves |= direction;
+            else
+            {
+                while ((direction & _emptyBitboard) != 0)
+                {
+                    direction &= _emptyBitboard;
+                    moves |= direction;
+                    direction = QueenDirections[i](direction);
+                }
+                if ((direction & _fullBitboard[color ^ 1]) != 0)
+                    moves |= direction;
+            }
         }
-
         return moves;
     }
 
-    private ulong GenerateBishopMoves(ulong bitboard, bool isWhite, int constraint)
-    {
-        if (constraint != 0)
-        {
-            if (constraint < 4)
-                return 0UL;
-            return IterDir(bitboard, isWhite, constraint - 1, constraint + 1);
-        }
-        return IterDir(bitboard, isWhite, 4, 8);
-    }
-
-    private ulong GenerateRookMoves(ulong bitboard, bool isWhite, int constraint)
+    private ulong GenerateBishopMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         if (constraint != 0)
         {
             if (constraint > 4)
                 return 0UL;
-            return IterDir(bitboard, isWhite, constraint - 1, constraint + 1);
+            return IterDir(bitboard, color, isCoverage, constraint - 1, constraint + 1);
         }
-        return IterDir(bitboard, isWhite, 0, 4);
+        return IterDir(bitboard, color, isCoverage, 0, 4);
+
     }
 
-    private ulong GenerateQueenMoves(ulong bitboard, bool isWhite, int constraint)
+    private ulong GenerateRookMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         if (constraint != 0)
-            return IterDir(bitboard, isWhite, constraint - 1, constraint + 1);
-        return IterDir(bitboard, isWhite, 0, 8);
+        {
+            if (constraint < 4)
+                return 0UL;
+            return IterDir(bitboard, color, isCoverage, constraint - 1, constraint + 1);
+        }
+        return IterDir(bitboard, color, isCoverage, 4, 8);
     }
 
-    private ulong GenerateKingMoves(ulong bitboard, bool isWhite, int constraint)
+    private ulong GenerateQueenMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
-        ulong moves = 0UL;
-        int   color = isWhite ?  0 : 1;
-        ulong enemyMaskCoverage = _coverageSet ? _pieceCoverage[color ^ 1] : 0UL;
-
-        ulong[] kingMoves = {
-            North(bitboard), South(bitboard), East(bitboard), West(bitboard),
-            NorthEast(bitboard), NorthWest(bitboard), SouthEast(bitboard), SouthWest(bitboard)
-        };
-
-        foreach (var move in kingMoves)
-            if ((move & (_emptyBitboard | _fullBitboard[color ^ 1]) & ~enemyMaskCoverage) != 0)
-                moves |= move;
-        return moves;
+        if (constraint != 0)
+            return IterDir(bitboard, color, isCoverage, constraint - 1, constraint + 1);
+        return IterDir(bitboard, color, isCoverage, 0, 8);
     }
 
-    private int AxisConstraint(ulong pieceBitboard, bool isWhite)
+    private ulong GenerateKingMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
-        int color = isWhite ?  0 : 1;
-        
+        ulong kingMoves = North(bitboard) | South(bitboard) | East(bitboard) | West(bitboard) | NorthEast(bitboard) | NorthWest(bitboard) | SouthEast(bitboard) | SouthWest(bitboard);
+        kingMoves &= (_emptyBitboard | _fullBitboard[color ^ 1]) & ~_pieceCoverage[color ^ 1];
+
+        if (_castle[color, 0] && ((CastleSpace[color, 0] & _emptyBitboard) == CastleSpace[color, 0]))
+            kingMoves |= bitboard << 2;
+        if (_castle[color, 1] && ((CastleSpace[color, 1] & _emptyBitboard) == CastleSpace[color, 1]))
+            kingMoves |= bitboard >> 2;
+        return kingMoves;
+    }
+
+    private int AxisConstraint(ulong pieceBitboard, int color)
+    {
         if ((pieceBitboard & _pinnedToKing[color]) != 0)
         {
-            if ((pieceBitboard & (isWhite ? _bitboards['N'] : _bitboards['n'])) != 0)
+            if ((pieceBitboard & (color == 0 ? _bitboards['N'] : _bitboards['n'])) != 0)
                 return 1;
 
             if ((FileMasks[_kingPos[color,0]] & pieceBitboard) != 0)
@@ -143,39 +142,67 @@ public partial class Chess
         return 0;
     }
 
-    private bool IsCheck(ulong bitboard, bool isWhite)
+    private ulong CheckMask(int color, ulong bitboard, Func<ulong, ulong> direction)
     {
-        int   color = isWhite ?  0 : 1;
-        
-        ulong[] knightMoves = [
-            KnightNE(bitboard), KnightNW(bitboard), KnightSE(bitboard), KnightSW(bitboard),
-            KnightEN(bitboard), KnightES(bitboard), KnightWN(bitboard), KnightWS(bitboard)
-        ];
-        foreach (var move in knightMoves)
+        char king = color == 0 ? 'K' : 'k';
+        ulong mask = bitboard;
+
+        if (direction(bitboard) == mask) return mask;
+        do {
+            mask |= bitboard;
+            bitboard = direction(bitboard);
+            PrintBitBoard(bitboard);
+        } while ((_bitboards[king] & bitboard) == 0);
+        return mask;
+    }
+
+    private void SetCheckBy(int color, ulong bitboard, Func<ulong, ulong> direction)
+    {
+        while (bitboard != 0)
         {
-            Console.WriteLine(PieceSymbols[((color ^ 1) * 5) + 1]);
-            if ((move & (_emptyBitboard | _fullBitboard[PieceSymbols[((color ^ 1) * 5) + 1]])) != 0)
-                return true;
+            ulong bit = bitboard & ~(bitboard - 1);
+            int index = BitOperations.TrailingZeroCount(bit);
+            ulong bitboardPiece = 1UL << index;
+
+            _checkBy[color].Add(bitboardPiece, CheckMask(color, bitboardPiece, direction));
+            bitboard &= bitboard - 1;
         }
+    }
+
+    private bool IsCheck(int color)
+    {
+        _checkBy[color].Clear();
+        char[] pieces = color == 0 ? ['K','n','b','r','q'] : ['k','N','B','R','Q'];
+    
+        ulong knightMoves = KnightNE(_bitboards[pieces[0]]) | KnightNW(_bitboards[pieces[0]]) | KnightSE(_bitboards[pieces[0]]) | KnightSW(_bitboards[pieces[0]]) | KnightEN(_bitboards[pieces[0]]) | KnightES(_bitboards[pieces[0]]) | KnightWN(_bitboards[pieces[0]]) | KnightWS(_bitboards[pieces[0]]);
+        knightMoves &= _bitboards[pieces[1]];
+
+        SetCheckBy(color, knightMoves, Self);
+
         for (int i = 0; i < 8; i++)
         {
-            ulong direction = QueenDirections[i](bitboard);
-
-            while ((direction & _emptyBitboard) != 0)
+            ulong direction = QueenDirections[i](_bitboards[pieces[0]]);
+            char bishop_rook = i < 4 ? pieces[2] : pieces[3];
+            while (direction > 0)
             {
+                SetCheckBy(color, direction & _bitboards[pieces[4]], QueenDirections[i + ((i % 2 == 0) ? 1 : -1)]);
+                SetCheckBy(color, direction & _bitboards[bishop_rook], QueenDirections[i + ((i % 2 == 0) ? 1 : -1)]);
+
                 direction &= _emptyBitboard;
                 direction = QueenDirections[i](direction);
             }
-            if ((direction & (_fullBitboard[PieceSymbols[((color ^ 1) * 5) + 4]] | _fullBitboard[PieceSymbols[((color ^ 1) * 5) + (i % 4) + 2]])) != 0)
-                return true;
         }
-
-        return false;
+        if (_checkBy[color].Count != 0)
+        {
+            _castle[color,0] = false;
+            _castle[color,1] = false;
+        }
+        return _checkBy[color].Count != 0;
     }
 
     public void GetAllMovesForPiece(char piece)
     {
-        bool isWhite = char.IsUpper(piece);
+        int color = char.IsUpper(piece) ? 0 : 1;
         char pieceKey = char.ToLower(piece);
 
         if (_moveGenerators.TryGetValue(pieceKey, out var generateMoves))
@@ -185,22 +212,19 @@ public partial class Chess
             {
                 ulong pieceBitboard = piecesMask & ~(piecesMask - 1);
                 piecesMask &= piecesMask - 1;
-                int constraint = AxisConstraint(pieceBitboard, isWhite);
+                
+                if (_checkBy[color].Count == 2 && pieceKey != 'k')
+                    if(!_movesBitboard[color].TryAdd(pieceBitboard, 0UL))
+                        _movesBitboard[color][pieceBitboard] = 0UL;
+                
+                int constraint = AxisConstraint(pieceBitboard, color);
+                ulong movesBitboards = generateMoves(pieceBitboard, color, false, constraint);
 
-                string piecePosition = piece.ToString() + ", " + BitboardToSquare(pieceBitboard);
-                ulong movesBitboards = generateMoves(pieceBitboard, isWhite, constraint);
-                List<string> moves = BitboardToSquares(movesBitboards);
+                if (_checkBy[color].Count == 1 && pieceKey != 'k')
+                    movesBitboards &= _checkBy[color].ElementAt(0).Value;
 
-                if (isWhite)
-                {
-                    if (!_whiteMoves.TryAdd(piecePosition, moves))
-                        _whiteMoves[piecePosition] = moves;
-                }
-                else
-                {
-                    if (!_blackMoves.TryAdd(piecePosition, moves))
-                        _blackMoves[piecePosition] = moves;
-                }
+                if(!_movesBitboard[color].TryAdd(pieceBitboard, movesBitboards))
+                    _movesBitboard[color][pieceBitboard] = movesBitboards;
             }
         }
     }
