@@ -16,20 +16,14 @@ public partial class Chess
     private static ulong SouthEast(ulong bitboard) => (bitboard << Size + 1) & ~FileMasks[0];
     private static ulong SouthWest(ulong bitboard) => (bitboard << Size - 1) & ~FileMasks[Size - 1];
 
-    private static readonly Func<ulong, ulong>[] RookDirections = [ North, South, East, West ];
-    private static readonly Func<ulong, ulong>[] BishopDirections = [ NorthEast, SouthWest, NorthWest, SouthEast ];
+    private static readonly Func<ulong, ulong>[] RookDirections = [North, South, East, West];
+    private static readonly Func<ulong, ulong>[] BishopDirections = [NorthEast, SouthWest, NorthWest, SouthEast];
     private static readonly Func<ulong, ulong>[] QueenDirections = [.. BishopDirections, .. RookDirections];
+    private static readonly Func<ulong, ulong>[] PawnDirection = [North, South];
+    private static readonly Func<ulong, ulong>[,] PawnAttack = {{NorthEast, NorthWest}, {SouthWest, SouthEast}};
 
-    private static readonly Func<char, char>[] Cap = [ char.ToUpper, char.ToLower ];
-
-    // Knight moves
-    private static ulong KnightNE(ulong bitboard) => (bitboard >> 17) & 0x7F7F7F7F7F7F7F7F;
-    private static ulong KnightNW(ulong bitboard) => (bitboard >> 15) & 0xFEFEFEFEFEFEFEFE;
-    private static ulong KnightSE(ulong bitboard) => (bitboard << 15) & 0x7F7F7F7F7F7F7F7F;
-    private static ulong KnightSW(ulong bitboard) => (bitboard << 17) & 0xFEFEFEFEFEFEFEFE;
-    private static ulong KnightEN(ulong bitboard) => (bitboard >> 10) & 0x3F3F3F3F3F3F3F3F;
-    private static ulong KnightES(ulong bitboard) => (bitboard << 6) & 0x3F3F3F3F3F3F3F3F;
-    private static ulong KnightWN(ulong bitboard) => (bitboard >> 6) & 0xFCFCFCFCFCFCFCFC;
-    private static ulong KnightWS(ulong bitboard) => (bitboard << 10) & 0xFCFCFCFCFCFCFCFC;
+    private static readonly ulong[] KnightMasks = [0x7F7F7F7F7F7F7F7FUL, 0xFEFEFEFEFEFEFEFEUL, 0x3F3F3F3F3F3F3F3FUL, 0xFCFCFCFCFCFCFCFCUL];
+    private static ulong KnightMoves(ulong bitboard) => (bitboard >> 17) & KnightMasks[0] | (bitboard >> 15) & KnightMasks[1] | (bitboard << 15) & KnightMasks[0] | (bitboard << 17) & KnightMasks[1]
+                                                        | (bitboard >> 10) & KnightMasks[2] | (bitboard << 6) & KnightMasks[2] | (bitboard >> 6) & KnightMasks[3] | (bitboard << 10) & KnightMasks[3];
 }
 }

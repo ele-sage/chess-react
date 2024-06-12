@@ -1,4 +1,3 @@
-using System.Drawing;
 using System.Numerics;
 
 namespace ChessAPI
@@ -14,16 +13,18 @@ public partial class Chess
         ulong moves = 0UL;
         if (isCoverage)
         {
-            _pieceAttack[color]  |= color == 0 ? (NorthEast(bitboard) | NorthWest(bitboard)) & (_fullBitboard[1] | _enPassantMask) : (SouthEast(bitboard) | SouthWest(bitboard)) & (_fullBitboard[0] | _enPassantMask);
-            return color == 0 ? (NorthEast(bitboard) | NorthWest(bitboard)) & ~_fullBitboard[color ^ 1] : (SouthEast(bitboard) | SouthWest(bitboard)) & ~_fullBitboard[color ^ 1];
+            ulong diagonal = PawnAttack[color,0](bitboard) | PawnAttack[color,1](bitboard);
+            _pieceAttack[color] |=  diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
+            return diagonal & ~_fullBitboard[color];
         }
-        if (constraint == 0 || constraint == 1)
+        if (constraint < 2)
         {
-            ulong singleStep;
-            moves |= singleStep = color == 0 ? North(bitboard) & _emptyBitboard : South(bitboard) & _emptyBitboard;
-            moves |= color == 0 ? North(singleStep) & _emptyBitboard & RankMasks[3] : South(singleStep) & _emptyBitboard & RankMasks[4];
+            ulong diagonal = PawnAttack[color,0](bitboard) | PawnAttack[color,1](bitboard);
+
+            moves = PawnDirection[color](bitboard) & _emptyBitboard;
+            moves |= PawnDirection[color](moves) & _emptyBitboard & RankMasks[3 + color];
             if (constraint == 0)
-                moves |= color == 0 ? (NorthEast(bitboard) | NorthWest(bitboard)) & (_fullBitboard[1] | _enPassantMask) : (SouthEast(bitboard) | SouthWest(bitboard)) & (_fullBitboard[0] | _enPassantMask);
+                moves |= diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
         }
 
         return moves;
@@ -34,7 +35,7 @@ public partial class Chess
         if (constraint != 0)
             return 0UL;
 
-        ulong knightMoves = KnightNE(bitboard) | KnightNW(bitboard) | KnightSE(bitboard) | KnightSW(bitboard) | KnightEN(bitboard) | KnightES(bitboard) | KnightWN(bitboard) | KnightWS(bitboard);
+        ulong knightMoves = KnightMoves(bitboard);
 
         if (isCoverage)
             _pieceAttack[color] |= knightMoves & _fullBitboard[color ^ 1];
@@ -151,7 +152,7 @@ public partial class Chess
         do {
             mask |= bitboard;
             bitboard = direction(bitboard);
-            PrintBitBoard(bitboard);
+            // PrintBitBoard(bitboard);
         } while ((_bitboards[king] & bitboard) == 0);
         return mask;
     }
@@ -174,8 +175,7 @@ public partial class Chess
         _checkBy[color].Clear();
         char[] pieces = color == 0 ? ['K','n','b','r','q'] : ['k','N','B','R','Q'];
     
-        ulong knightMoves = KnightNE(_bitboards[pieces[0]]) | KnightNW(_bitboards[pieces[0]]) | KnightSE(_bitboards[pieces[0]]) | KnightSW(_bitboards[pieces[0]]) | KnightEN(_bitboards[pieces[0]]) | KnightES(_bitboards[pieces[0]]) | KnightWN(_bitboards[pieces[0]]) | KnightWS(_bitboards[pieces[0]]);
-        knightMoves &= _bitboards[pieces[1]];
+        ulong knightMoves = KnightMoves(_bitboards[pieces[0]]) & _bitboards[pieces[1]];
 
         SetCheckBy(color, knightMoves, Self);
 
@@ -198,35 +198,6 @@ public partial class Chess
             _castle[color,1] = false;
         }
         return _checkBy[color].Count != 0;
-    }
-
-    public void GetAllMovesForPiece(char piece)
-    {
-        int color = char.IsUpper(piece) ? 0 : 1;
-        char pieceKey = char.ToLower(piece);
-
-        if (_moveGenerators.TryGetValue(pieceKey, out var generateMoves))
-        {
-            ulong piecesMask = _bitboards[piece];
-            while (piecesMask != 0)
-            {
-                ulong pieceBitboard = piecesMask & ~(piecesMask - 1);
-                piecesMask &= piecesMask - 1;
-                
-                if (_checkBy[color].Count == 2 && pieceKey != 'k')
-                    if(!_movesBitboard[color].TryAdd(pieceBitboard, 0UL))
-                        _movesBitboard[color][pieceBitboard] = 0UL;
-                
-                int constraint = AxisConstraint(pieceBitboard, color);
-                ulong movesBitboards = generateMoves(pieceBitboard, color, false, constraint);
-
-                if (_checkBy[color].Count == 1 && pieceKey != 'k')
-                    movesBitboards &= _checkBy[color].ElementAt(0).Value;
-
-                if(!_movesBitboard[color].TryAdd(pieceBitboard, movesBitboards))
-                    _movesBitboard[color][pieceBitboard] = movesBitboards;
-            }
-        }
     }
 }
 }

@@ -1,0 +1,33 @@
+   noWe         nort         noEa
+           +7    +8    +9
+               \  |  /
+   west    -1 <-  0 -> +1    east
+               /  |  \
+           -9    -8    -7
+   soWe         sout         soEa
+
+
+  Number of plies (half-moves)  |  Number of possible positions[2]  |  Number of checkmates[3]
+             1	              |              20	                  |            0
+             2	              |              400	              |            0
+             3	              |              8,902	              |            0
+             4	              |              197,281	          |            8
+             5	              |              4,865,609	          |            347
+             6	              |              119,060,324	      |            10,828
+
+r3k1nr/p1ppqp1p/1p1bp1p1/3N4/8/BP1bPN2/P1nP1PPP/R1Q1K2R w kq - 0 11
+r3k1nr/p1ppqp1p/1pnbp1p1/3N4/8/BP1bPN2/P1PP1PPP/R2Q1K1R w kq - 0 9 white check
+r3k1nr/p1ppqp1p/bpnbp1p1/3N4/8/BP1BPN2/P1PP1PPP/R2QK2R w KQkq - 0 8
+r3k2r/p1ppqppp/bpnbpn2/8/8/BPNBPN2/P1PPQPPP/R3K2R w KQkq - 6 8 both
+r3k1nr/p1ppqppp/bpnbp3/8/8/BPNBPN2/P1PP1PPP/R2QK2R w KQkq - 4 7 Kq
+rn2kbnr/1p5p/p2pKpp1/2p1pPB1/N3P3/4Q1N1/PPR3PP/4qB1R b kq - 1 19
+rn2kbnr/1p5p/p2pKpp1/2p1pPB1/N3P3/4Q1N1/PP1R2PP/4qB1R w kq - 0 19
+rn2kbnr/1p3p1p/p2p4/2pKppB1/3RP3/2N2qN1/PP4PP/3Q1B1R w kq - 2 21
+rn2kbnr/1p3ppp/p2p4/2pKpPB1/3RP3/2N1Q1N1/PP4PP/4qB1R b kq - 12 17
+rn2kbnr/1p3ppp/p2p4/2pKpPB1/4P3/2N1Q1N1/PP1R2PP/4qB1R w kq - 11 17
+rn2kbnr/1p3ppp/p2p4/2pKPPq1/N2p4/8/PP2b1PP/R1B2BNR b kq - 0 13
+rn2kbnr/1p3ppp/p2p4/2pK1Pq1/N2pP3/8/PP2b1PP/R1B2BNR w kq - 2 13
+rn2kbnr/pp3ppp/3p4/2p1pP2/2K1P1b1/8/PPq1Q1PP/RNB2BNR w kq - 0 8
+rn2kbnr/pp3ppp/3p4/2p1pP2/2K1P1b1/2N5/PPq1Q1PP/R1B2BNR b kq - 1 8
+rn2kbnr/1p3ppp/p2p4/2p1pP2/2K1P3/2NQ4/PPq1b1PP/R1B2BNR w kq - 2 10
+rn2kbnr/1p3ppp/p2p4/2pKpP2/4P3/2Nq4/PP2b1PP/R1B2BNR w kq - 0 11 check mate

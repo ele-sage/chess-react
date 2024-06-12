@@ -5,6 +5,23 @@ namespace ChessAPI
 // Chess.Utils.cs
 public partial class Chess
 {
+
+    private HashSet<(ulong[], ulong[])> seenPositions;
+
+    private bool IsUniqueBoardPosition()
+    {
+        ulong[] bitboardWhite = [_bitboards['P'], _bitboards['N'], _bitboards['B'], _bitboards['R'], _bitboards['Q'], _bitboards['K']];
+        ulong[] bitboardBlack = [_bitboards['p'], _bitboards['n'], _bitboards['b'], _bitboards['r'], _bitboards['q'], _bitboards['k']];
+        var currentPosition = (bitboardWhite, bitboardBlack);
+
+        if (seenPositions.Contains(currentPosition) == false)
+        {
+            seenPositions.Add(currentPosition);
+            return true;
+        }
+        return false;
+    }
+
     private static ulong FileRankToMask(string fileRank)
     {
         int i = 0;
@@ -109,19 +126,16 @@ public partial class Chess
         if (_castle[1,0]) castle += "k";
         if (_castle[1,1]) castle += "q";
         if (castle.Length == 0) castle = "-";
-        fen += ((_turn == 'w') ? " b " : " w ") + castle + " " + _enPassant + " " + _halfmove.ToString() + " " + ((_turn == 'w') ? _fullmove : _fullmove + 1).ToString();
-
-        // Console.WriteLine();
-        // Console.WriteLine(_fen);
-        // Console.WriteLine(fen);
-        return fen;
+        string enPassant = _enPassantMask == 0 ? "-" : BitboardToSquare(_enPassantMask);
+        _fen = fen + " " + _turn + " " + castle + " " + enPassant + " " + _halfmove.ToString() + " " + ((_turn == 'w') ? _fullmove : _fullmove++).ToString();
+        return _fen;
     }
 
     private ulong GetRandomMove(ulong moves)
     {
         List<ulong> indexes = [];
         Random rnd = new();
-
+        
         while (moves != 0)
         {
             ulong bit = moves & ~(moves - 1);
@@ -133,8 +147,6 @@ public partial class Chess
 
     public void DoRandomMove(int color)
     {
-        int start1 = color == 0 ? 0 : 6;
-        int start2 = color == 0 ? 6 : 0;
         Random rnd = new();
         int random = rnd.Next(_movesBitboard[color].Count);
         int index = 1;
@@ -142,42 +154,13 @@ public partial class Chess
         KeyValuePair<ulong, ulong> keyValue = _movesBitboard[color].ElementAt(random);
 
         while (keyValue.Value == 0 && index < _movesBitboard[color].Count)
-            keyValue = _movesBitboard[color].ElementAt(random + index % _movesBitboard[color].Count);
+        {
+            keyValue = _movesBitboard[color].ElementAt((random + index) % _movesBitboard[color].Count);
+            index++;
+        }
         if (keyValue.Value == 0)
             return;
-        
-        for (int i = start1; i < start1 + 6; i++)
-        {
-            if ((keyValue.Key & _bitboards[PieceSymbols[i]]) != 0)
-            {
-                _bitboards[PieceSymbols[i]] &= ~keyValue.Key;
-                ulong newPos = GetRandomMove(keyValue.Value);
-                _bitboards[PieceSymbols[i]] |= newPos;
-
-                _halfmove++;
-                for (int j = start2; j < start2 + 6; j++)
-                {
-                    if ((newPos & _bitboards[PieceSymbols[j]]) != 0)
-                    {
-                        _bitboards[PieceSymbols[j]] &= ~newPos;
-                        _halfmove = 0;
-                        break;
-                    }
-                }
-                if (PieceSymbols[i] == 'P' && PieceSymbols[i] == 'P') _halfmove = 0;
-                if (PieceSymbols[i] == 'K')
-                {
-                    _castle[0,0] = false;
-                    _castle[0,1] = false;
-                }
-                else if (PieceSymbols[i] == 'k')
-                {
-                    _castle[1,0] = false;
-                    _castle[1,1] = false;
-                }
-                break;
-            }
-        }
+        // SetNewBitBoardState(keyValue.Key, GetRandomMove(keyValue.Value), color);
     }
 
     public Dictionary<string, List<string>> DoTurn()
@@ -187,12 +170,12 @@ public partial class Chess
         char[]  enemyPieces = color == 0 ? ['p', 'n', 'b', 'r', 'q', 'k'] : ['P', 'N', 'B', 'R', 'Q', 'K'];
         Dictionary<string, List<string>> legalMoves = [];
 
-        IsCheck(color);
+        Console.WriteLine("before your moves");
         foreach (char piece in pieces)
             GetAllMovesForPiece(piece);
         DoRandomMove(color);
-
-        IsCheck(color ^ 1);
+        
+        SetCoverage(color);
         foreach (char piece in enemyPieces)
             GetAllMovesForPiece(piece);
 
@@ -227,6 +210,18 @@ public partial class Chess
         foreach (char piece in PieceSymbols)
             GetAllMovesForPiece(piece);
 
+        i = 0;
+        foreach (var color in _movesBitboard)
+        {
+            foreach (var moves in color)
+            {
+                string piecePosition = BitboardToSquare(moves.Key);
+                List<string> moveSet = BitboardToSquares(moves.Value);
+                if(!_moves[i].TryAdd(piecePosition, moveSet))
+                    _moves[i][piecePosition] = moveSet;
+            }
+            i++;
+        }
         foreach (var color in _moves)
         {
             foreach (var moves in color)
@@ -237,16 +232,14 @@ public partial class Chess
             }
             Console.WriteLine();
         }
-        // Console.Write("\nWhite attack:");
-        // PrintBitBoard(_pieceAttack[0]);
-        // Console.Write("\nBlack attack:");
-        // PrintBitBoard(_pieceAttack[1]);
-        // Console.Write("\nWhite Coverage:");
-        // PrintBitBoard(_pieceCoverage[0]);
-        // Console.Write("\nBlack Coverage:");
-        // PrintBitBoard(_pieceCoverage[1]);
-        DoRandomMove(_turn == 'w' ? 0 : 1);
-        PrintBoard();
+        Console.Write("\nWhite attack:");
+        PrintBitBoard(_pieceAttack[0]);
+        Console.Write("\nBlack attack:");
+        PrintBitBoard(_pieceAttack[1]);
+        Console.Write("\nWhite Coverage:");
+        PrintBitBoard(_pieceCoverage[0]);
+        Console.Write("\nBlack Coverage:");
+        PrintBitBoard(_pieceCoverage[1]);
     }
     
     public void PrintBoard()
@@ -272,6 +265,66 @@ public partial class Chess
             Console.WriteLine(row);
         }
         Console.WriteLine("  a b c d e f g h");
+    }
+
+    public void GetAllMovesForPiece(char piece)
+    {
+        int color = char.IsUpper(piece) ? 0 : 1;
+        char pieceKey = char.ToLower(piece);
+
+        if (_moveGenerators.TryGetValue(pieceKey, out var generateMoves))
+        {
+            ulong piecesMask = _bitboards[piece];
+            while (piecesMask != 0)
+            {
+                ulong pieceBitboard = piecesMask & ~(piecesMask - 1);
+                piecesMask &= piecesMask - 1;
+                
+                if (_checkBy[color].Count == 2 && pieceKey != 'k')
+                    if(!_movesBitboard[color].TryAdd(pieceBitboard, 0UL))
+                        _movesBitboard[color][pieceBitboard] = 0UL;
+                
+                int constraint = AxisConstraint(pieceBitboard, color);
+                ulong movesBitboards = generateMoves(pieceBitboard, color, false, constraint);
+
+                if (_checkBy[color].Count == 1 && pieceKey != 'k')
+                    movesBitboards &= _checkBy[color].ElementAt(0).Value;
+
+                if(!_movesBitboard[color].TryAdd(pieceBitboard, movesBitboards))
+                    _movesBitboard[color][pieceBitboard] = movesBitboards;
+            }
+        }
+    }
+
+    public void SetAllMoves(int color)
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            char pieceKey = char.ToLower(Pieces[color ^ 1,i]);
+
+            if (_moveGenerators.TryGetValue(pieceKey, out var generateMoves))
+            {
+                ulong piecesMask = _bitboards[Pieces[color ^ 1,i]];
+                while (piecesMask != 0)
+                {
+                    ulong pieceBitboard = piecesMask & ~(piecesMask - 1);
+                    piecesMask &= piecesMask - 1;
+                    
+                    if (_checkBy[color].Count == 2 && pieceKey != 'k')
+                        if(!_movesBitboard[color].TryAdd(pieceBitboard, 0UL))
+                            _movesBitboard[color][pieceBitboard] = 0UL;
+                    
+                    int constraint = AxisConstraint(pieceBitboard, color);
+                    ulong movesBitboards = generateMoves(pieceBitboard, color, false, constraint);
+
+                    if (_checkBy[color].Count == 1 && pieceKey != 'k')
+                        movesBitboards &= _checkBy[color].ElementAt(0).Value;
+
+                    if(!_movesBitboard[color].TryAdd(pieceBitboard, movesBitboards))
+                        _movesBitboard[color][pieceBitboard] = movesBitboards;
+                }
+            }
+        }
     }
 }
 }
