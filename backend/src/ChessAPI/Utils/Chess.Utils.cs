@@ -5,21 +5,42 @@ namespace ChessAPI
 // Chess.Utils.cs
 public partial class Chess
 {
-
-    private HashSet<(ulong[], ulong[])> seenPositions;
-
-    private bool IsUniqueBoardPosition()
+    private void PrintAllFieldsToFile(string path)
     {
-        ulong[] bitboardWhite = [_bitboards['P'], _bitboards['N'], _bitboards['B'], _bitboards['R'], _bitboards['Q'], _bitboards['K']];
-        ulong[] bitboardBlack = [_bitboards['p'], _bitboards['n'], _bitboards['b'], _bitboards['r'], _bitboards['q'], _bitboards['k']];
-        var currentPosition = (bitboardWhite, bitboardBlack);
-
-        if (seenPositions.Contains(currentPosition) == false)
+        using (StreamWriter sw = new(path))
         {
-            seenPositions.Add(currentPosition);
-            return true;
+            sw.WriteLine("Board:");
+            sw.WriteLine(GetBoard());
+            foreach (var bitboard in _bitboards)
+                sw.WriteLine($"{bitboard.Key}: {GetBitBoard(bitboard.Value)}");
+            sw.WriteLine("\nFull Bitboards:");
+            sw.WriteLine($"White: {GetBitBoard(_fullBitboard[0])}\nBlack: {GetBitBoard(_fullBitboard[1])}");
+            sw.WriteLine("\nPinned to King:");
+            sw.WriteLine($"White: {GetBitBoard(_pinnedToKing[0])}\nBlack: {GetBitBoard(_pinnedToKing[1])}");
+            sw.WriteLine("\nPiece Coverage:");
+            sw.WriteLine($"White: {GetBitBoard(_pieceCoverage[0])}\nBlack: {GetBitBoard(_pieceCoverage[1])}");
+            sw.WriteLine("\nPiece Attack:");
+            sw.WriteLine($"White: {GetBitBoard(_pieceAttack[0])}\nBlack: {GetBitBoard(_pieceAttack[1])}");
+            sw.WriteLine("\nCheck By:");
+            foreach (var check in _checkBy)
+            {
+                foreach (var checkBy in check)
+                    sw.WriteLine($"{checkBy.Key}: {checkBy.Value}");
+            }
+            sw.WriteLine("\nKing Position:");
+            sw.WriteLine($"White: {_kingPos[0,0]}, {_kingPos[0,1]}\nBlack: {_kingPos[1,0]}, {_kingPos[1,1]}");
+            sw.WriteLine("\nEmpty Bitboard:");
+            sw.WriteLine(_emptyBitboard);
+            sw.WriteLine("\nEn Passant Mask:");
+            sw.WriteLine(_enPassantMask);
+            sw.WriteLine("\nCastle:");
+            sw.WriteLine($"White: {_castle[0,0]}, {_castle[0,1]}\nBlack: {_castle[1,0]}, {_castle[1,1]}");
         }
-        return false;
+    }
+
+    private void SetFullBitboard(int color)
+    {
+        _fullBitboard[color] = _bitboards[Pieces[color,0]] | _bitboards[Pieces[color,1]] | _bitboards[Pieces[color,2]] | _bitboards[Pieces[color,3]] | _bitboards[Pieces[color,4]] | _bitboards[Pieces[color,5]];
     }
 
     private static ulong FileRankToMask(string fileRank)
@@ -65,15 +86,6 @@ public partial class Chess
             bitboard &= bitboard - 1;
         }
         return squares;
-    }
-
-    public static ulong FileRankToBitboard(string fileRank)
-    {
-        int file = fileRank[0] - 'a';
-        int rank = fileRank[1] - '1';
-
-        int bitPosition = rank * Size + file;
-        return 1UL << bitPosition;
     }
 
     public static void PrintBitBoard(ulong bitboard)
@@ -127,123 +139,15 @@ public partial class Chess
         if (_castle[1,1]) castle += "q";
         if (castle.Length == 0) castle = "-";
         string enPassant = _enPassantMask == 0 ? "-" : BitboardToSquare(_enPassantMask);
-        _fen = fen + " " + _turn + " " + castle + " " + enPassant + " " + _halfmove.ToString() + " " + ((_turn == 'w') ? _fullmove : _fullmove++).ToString();
+        _fen = fen + " " + _turn + " " + castle + " " + enPassant + " " + _halfmove.ToString() + " " + _fullmove.ToString();
         return _fen;
     }
 
-    private ulong GetRandomMove(ulong moves)
+    public void PrintBoard(string something = "")
     {
-        List<ulong> indexes = [];
-        Random rnd = new();
-        
-        while (moves != 0)
-        {
-            ulong bit = moves & ~(moves - 1);
-            indexes.Add(bit);
-            moves &= moves - 1;
-        }
-        return indexes[rnd.Next(indexes.Count)];
-    }
-
-    public void DoRandomMove(int color)
-    {
-        Random rnd = new();
-        int random = rnd.Next(_movesBitboard[color].Count);
-        int index = 1;
-            
-        KeyValuePair<ulong, ulong> keyValue = _movesBitboard[color].ElementAt(random);
-
-        while (keyValue.Value == 0 && index < _movesBitboard[color].Count)
-        {
-            keyValue = _movesBitboard[color].ElementAt((random + index) % _movesBitboard[color].Count);
-            index++;
-        }
-        if (keyValue.Value == 0)
-            return;
-        // SetNewBitBoardState(keyValue.Key, GetRandomMove(keyValue.Value), color);
-    }
-
-    public Dictionary<string, List<string>> DoTurn()
-    {
-        int color = _turn == 'w' ? 0 : 1;
-        char[]  pieces = color == 0 ? ['P', 'N', 'B', 'R', 'Q', 'K'] : ['p', 'n', 'b', 'r', 'q', 'k'];
-        char[]  enemyPieces = color == 0 ? ['p', 'n', 'b', 'r', 'q', 'k'] : ['P', 'N', 'B', 'R', 'Q', 'K'];
-        Dictionary<string, List<string>> legalMoves = [];
-
-        Console.WriteLine("before your moves");
-        foreach (char piece in pieces)
-            GetAllMovesForPiece(piece);
-        DoRandomMove(color);
-        
-        SetCoverage(color);
-        foreach (char piece in enemyPieces)
-            GetAllMovesForPiece(piece);
-
-        foreach (var moves in _movesBitboard[color ^ 1])
-        {
-            string piecePosition = BitboardToSquare(moves.Key);
-            List<string> moveSet = BitboardToSquares(moves.Value);
-            if(!legalMoves.TryAdd(piecePosition, moveSet))
-                legalMoves[piecePosition] = moveSet;
-        }
-        return legalMoves;
-    }
-
-    public void PrintAllAccessibleSquares()
-    {
-        int i = 0;
-        foreach (var color in _checkBy)
-        {
-            if(IsCheck(i))
-            {
-                string c = i == 0 ? "White" : "Black";
-                Console.Write($"\n{c} king is check by ");
-                foreach (var moves in _checkBy[i])
-                {
-                    string pos = BitboardToSquare(moves.Key);
-                    ulong piece = moves.Value;
-                    Console.WriteLine($"{pos}: [{string.Join(", ", piece)}]");
-                }
-            }
-            i++;
-        }
-        foreach (char piece in PieceSymbols)
-            GetAllMovesForPiece(piece);
-
-        i = 0;
-        foreach (var color in _movesBitboard)
-        {
-            foreach (var moves in color)
-            {
-                string piecePosition = BitboardToSquare(moves.Key);
-                List<string> moveSet = BitboardToSquares(moves.Value);
-                if(!_moves[i].TryAdd(piecePosition, moveSet))
-                    _moves[i][piecePosition] = moveSet;
-            }
-            i++;
-        }
-        foreach (var color in _moves)
-        {
-            foreach (var moves in color)
-            {
-                string key = moves.Key;
-                List<string> value = moves.Value;
-                Console.WriteLine($"{key}: [{string.Join(", ", value)}]");
-            }
-            Console.WriteLine();
-        }
-        Console.Write("\nWhite attack:");
-        PrintBitBoard(_pieceAttack[0]);
-        Console.Write("\nBlack attack:");
-        PrintBitBoard(_pieceAttack[1]);
-        Console.Write("\nWhite Coverage:");
-        PrintBitBoard(_pieceCoverage[0]);
-        Console.Write("\nBlack Coverage:");
-        PrintBitBoard(_pieceCoverage[1]);
-    }
-    
-    public void PrintBoard()
-    {
+        string board = something;
+        if (board == "")
+            Console.WriteLine($"------------------ {_turn}");
         for (int rank = 0; rank < Size; rank++)
         {
             string row = $"{Size - rank} ";
@@ -262,69 +166,88 @@ public partial class Chess
                 }
                 row += piece + " ";
             }
-            Console.WriteLine(row);
+            if (board != "")
+                board += row + "\n";
+            else
+                Console.WriteLine(row);
         }
-        Console.WriteLine("  a b c d e f g h");
+        board += "  a b c d e f g h\n";
+        Console.WriteLine(board);
     }
 
-    public void GetAllMovesForPiece(char piece)
+    public string GetBoard()
     {
-        int color = char.IsUpper(piece) ? 0 : 1;
-        char pieceKey = char.ToLower(piece);
-
-        if (_moveGenerators.TryGetValue(pieceKey, out var generateMoves))
+        string board = "";
+        for (int rank = 0; rank < Size; rank++)
         {
-            ulong piecesMask = _bitboards[piece];
-            while (piecesMask != 0)
+            string row = $"{Size - rank} ";
+            for (int file = 0; file < Size; file++)
             {
-                ulong pieceBitboard = piecesMask & ~(piecesMask - 1);
-                piecesMask &= piecesMask - 1;
-                
-                if (_checkBy[color].Count == 2 && pieceKey != 'k')
-                    if(!_movesBitboard[color].TryAdd(pieceBitboard, 0UL))
-                        _movesBitboard[color][pieceBitboard] = 0UL;
-                
-                int constraint = AxisConstraint(pieceBitboard, color);
-                ulong movesBitboards = generateMoves(pieceBitboard, color, false, constraint);
+                ulong squareMask = 1UL << (rank * Size + file);
+                char piece = '.';
 
-                if (_checkBy[color].Count == 1 && pieceKey != 'k')
-                    movesBitboards &= _checkBy[color].ElementAt(0).Value;
-
-                if(!_movesBitboard[color].TryAdd(pieceBitboard, movesBitboards))
-                    _movesBitboard[color][pieceBitboard] = movesBitboards;
-            }
-        }
-    }
-
-    public void SetAllMoves(int color)
-    {
-        for (int i = 0; i < 6; i++)
-        {
-            char pieceKey = char.ToLower(Pieces[color ^ 1,i]);
-
-            if (_moveGenerators.TryGetValue(pieceKey, out var generateMoves))
-            {
-                ulong piecesMask = _bitboards[Pieces[color ^ 1,i]];
-                while (piecesMask != 0)
+                for (int i = 0; i < PieceSymbols.Length; i++)
                 {
-                    ulong pieceBitboard = piecesMask & ~(piecesMask - 1);
-                    piecesMask &= piecesMask - 1;
-                    
-                    if (_checkBy[color].Count == 2 && pieceKey != 'k')
-                        if(!_movesBitboard[color].TryAdd(pieceBitboard, 0UL))
-                            _movesBitboard[color][pieceBitboard] = 0UL;
-                    
-                    int constraint = AxisConstraint(pieceBitboard, color);
-                    ulong movesBitboards = generateMoves(pieceBitboard, color, false, constraint);
-
-                    if (_checkBy[color].Count == 1 && pieceKey != 'k')
-                        movesBitboards &= _checkBy[color].ElementAt(0).Value;
-
-                    if(!_movesBitboard[color].TryAdd(pieceBitboard, movesBitboards))
-                        _movesBitboard[color][pieceBitboard] = movesBitboards;
+                    if ((_bitboards[PieceSymbols[i]] & squareMask) != 0)
+                    {
+                        piece = PieceSymbols[i];
+                        break;
+                    }
                 }
+                row += piece + " ";
             }
+            board += row + "\n";
         }
+        board += "  a b c d e f g h\n";
+        return board;
+    }
+
+    public static string GetBitBoard(ulong bitboard)
+    {
+        string board = "\n";
+        for (int rank = 0; rank < Size; rank++)
+        {
+            string row = $"{Size - rank} ";
+            for (int file = 0; file < Size; file++)
+            {
+                ulong squareMask = 1UL << (rank * Size + file);
+                char piece = (bitboard & squareMask) != 0 ? '1' : '0';
+                row += piece + " ";
+            }
+            board += row + "\n";
+        }
+        board += "  a b c d e f g h\n";
+        return board;
+    }
+
+
+    public List<string> DoTurn()
+    {
+        int color = _turn == 'w' ? 0 : 1;
+        List<string> legalMoves = [];
+
+        Move bestMove = GetBestMove(5);
+
+        if (bestMove.Piece == 'P' || bestMove.Piece == 'p' || (bestMove.To & (_fullBitboard[color ^ 1] | _enPassantMask)) != 0)
+            _halfmove = 0;
+        else
+            _halfmove++;
+        if (_turn == 'b')
+            _fullmove++;
+        Console.WriteLine(bestMove);
+        if (bestMove.Piece == '-' )
+            legalMoves.Add("Stalemate");
+        else if (bestMove.Piece == '+' )
+            legalMoves.Add("Checkmate");
+        ApplyMove(bestMove);
+        List<Move> moves = GetAllPossibleMoves(_turn);
+        foreach (var move in moves)
+        {
+            string moveSerialized = $"{BitboardToSquare(move.From)} {BitboardToSquare(move.To)} {move.Piece}";
+            Console.WriteLine(moveSerialized);
+            legalMoves.Add(moveSerialized);
+        }
+        return legalMoves;
     }
 }
 }

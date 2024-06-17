@@ -15,7 +15,7 @@ public partial class Chess
         {
             ulong diagonal = PawnAttack[color,0](bitboard) | PawnAttack[color,1](bitboard);
             _pieceAttack[color] |=  diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
-            return diagonal & ~_fullBitboard[color];
+            return diagonal & ~_fullBitboard[color ^ 1];
         }
         if (constraint < 2)
         {
@@ -112,9 +112,9 @@ public partial class Chess
         ulong kingMoves = North(bitboard) | South(bitboard) | East(bitboard) | West(bitboard) | NorthEast(bitboard) | NorthWest(bitboard) | SouthEast(bitboard) | SouthWest(bitboard);
         kingMoves &= (_emptyBitboard | _fullBitboard[color ^ 1]) & ~_pieceCoverage[color ^ 1];
 
-        if (_castle[color, 0] && ((CastleSpace[color, 0] & _emptyBitboard) == CastleSpace[color, 0]))
+        if (_castle[color, 0] && ((CastleSpace[color, 0] & _emptyBitboard & ~_pieceCoverage[color ^ 1]) == CastleSpace[color, 0]))
             kingMoves |= bitboard << 2;
-        if (_castle[color, 1] && ((CastleSpace[color, 1] & _emptyBitboard) == CastleSpace[color, 1]))
+        if (_castle[color, 1] && ((CastleSpace[color, 1] & _emptyBitboard & ~_pieceCoverage[color ^ 1]) == CastleSpace[color, 1]))
             kingMoves |= bitboard >> 2;
         return kingMoves;
     }
@@ -165,7 +165,11 @@ public partial class Chess
             int index = BitOperations.TrailingZeroCount(bit);
             ulong bitboardPiece = 1UL << index;
 
-            _checkBy[color].Add(bitboardPiece, CheckMask(color, bitboardPiece, direction));
+            // _checkBy[color].Add(bitboardPiece, CheckMask(color, bitboardPiece, direction));
+            if (_checkBy[color].ContainsKey(bitboardPiece))
+                _checkBy[color][bitboardPiece] |= CheckMask(color, bitboardPiece, direction);
+            else
+                _checkBy[color].Add(bitboardPiece, CheckMask(color, bitboardPiece, direction));
             bitboard &= bitboard - 1;
         }
     }

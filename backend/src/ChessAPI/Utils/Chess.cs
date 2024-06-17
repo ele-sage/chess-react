@@ -1,40 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
-
-//   noWe         nort         noEa
-//           +7    +8    +9
-//               \  |  /
-//   west    -1 <-  0 -> +1    east
-//               /  |  \
-//           -9    -8    -7
-//   soWe         sout         soEa
-
 namespace ChessAPI
 {
 // Chess.cs
 public partial class Chess
 {
-    private const int Size = 8;
-    private const string Fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    private static readonly char[] PieceSymbols = ['P', 'N', 'B', 'R', 'Q', 'K', 'p', 'n', 'b', 'r', 'q', 'k'];
-    private static readonly char[,] Pieces = {{'P', 'N', 'B', 'R', 'Q', 'K'}, {'p', 'n', 'b', 'r', 'q', 'k'}};
-    private static readonly ulong[] FileMasks = [
-        0x0101010101010101UL, 0x0202020202020202UL, 0x0404040404040404UL, 0x0808080808080808UL,
-        0x1010101010101010UL, 0x2020202020202020UL, 0x4040404040404040UL, 0x8080808080808080UL
-    ];
-    private static readonly ulong[] RankMasks = [
-        0xFF00000000000000UL, 0x00FF000000000000UL, 0x0000FF0000000000UL, 0x000000FF00000000UL,
-        0x00000000FF000000UL, 0x0000000000FF0000UL, 0x000000000000FF00UL, 0x00000000000000FFUL
-    ];
-
-    private void SetFullBitboard(int color)
+    private Dictionary<char, ulong> _bitboards = new()
     {
-        _fullBitboard[color] = _bitboards[Pieces[color,0]] | _bitboards[Pieces[color,1]] | _bitboards[Pieces[color,2]] | _bitboards[Pieces[color,3]] | _bitboards[Pieces[color,4]] | _bitboards[Pieces[color,5]];
-    }
+        {'P', 0UL}, {'N', 0UL}, {'B', 0UL}, {'R', 0UL}, {'Q', 0UL}, {'K', 0UL},
+        {'p', 0UL}, {'n', 0UL}, {'b', 0UL}, {'r', 0UL}, {'q', 0UL}, {'k', 0UL}
+    };
 
-    private Dictionary<char, ulong> _bitboards;
     private ulong[]         _fullBitboard = [0UL, 0UL];
     private ulong[]         _pinnedToKing = [0UL, 0UL];
     private ulong[]         _pieceCoverage = [0UL, 0UL];
@@ -53,11 +27,6 @@ public partial class Chess
 
     public Chess(string fen = Fen)
     {
-        _bitboards = new Dictionary<char, ulong>
-        {
-            {'P', 0UL}, {'N', 0UL}, {'B', 0UL}, {'R', 0UL}, {'Q', 0UL}, {'K', 0UL},
-            {'p', 0UL}, {'n', 0UL}, {'b', 0UL}, {'r', 0UL}, {'q', 0UL}, {'k', 0UL}
-        };
         _moveGenerators = new Dictionary<char, Func<ulong, int, bool, int, ulong>>
         {
             {'p', GeneratePawnMoves},
@@ -77,33 +46,7 @@ public partial class Chess
         _emptyBitboard = ~(_fullBitboard[0] | _fullBitboard[1]);
         SetKingPos();
         InitCoverage();
-        seenPositions = [];
-
     }
-
-    // public Chess(Chess other)
-    // {
-    //     _bitboards = new Dictionary<char, ulong>(other._bitboards);
-    //     _fullBitboard = (ulong[])other._fullBitboard.Clone();
-    //     _pinnedToKing = (ulong[])other._pinnedToKing.Clone();
-    //     _pieceCoverage = (ulong[])other._pieceCoverage.Clone();
-    //     _pieceAttack = (ulong[])other._pieceAttack.Clone();
-    //     _checkBy = new Dictionary<ulong, ulong>[2];
-    //     for (int i = 0; i < 2; i++)
-    //     {
-    //         _checkBy[i] = new Dictionary<ulong, ulong>(other._checkBy[i]);
-    //     }
-    //     _kingPos = (int[,])other._kingPos.Clone();
-    //     _emptyBitboard = other._emptyBitboard;
-    //     _enPassantMask = other._enPassantMask;
-    //     _possibleMove = other._possibleMove;
-    //     _fen = other._fen;
-    //     _turn = other._turn;
-    //     _castle = (bool[,])other._castle.Clone();
-    //     _halfmove = other._halfmove;
-    //     _fullmove = other._fullmove;
-    //     _moveGenerators = new Dictionary<char, Func<ulong, int, bool, int, ulong>>(other._moveGenerators);
-    // }
 
     private void InitializeBoard()
     {
@@ -149,6 +92,8 @@ public partial class Chess
                 _castle [1,1] = true;
             }
         }
+        while (i < _fen.Length && _fen[i] != ' ')
+            i++;
 
         // Possible En Passant Target Mask
         j = ++i;
@@ -158,12 +103,12 @@ public partial class Chess
         // Halfmove Clock
         j = ++i;
         while (++i < _fen.Length && _fen[i] != ' ');
-        _halfmove = int.Parse(_fen.Substring(j, i - j));
+        _halfmove = int.Parse(_fen[j..i]);
 
         // Fullmove Number
         j = ++i;
         while (++i < _fen.Length && _fen[i] != ' ');
-        _fullmove = int.Parse(_fen.Substring(j, i - j));
+        _fullmove = int.Parse(_fen[j..i]);
     }
 
     private ulong PinnedToKing(int color, Func<ulong, ulong>[] directions)
@@ -218,11 +163,11 @@ public partial class Chess
 
     private void SetCoverage(int color, bool kingCoverage = true)
     {
-        char[]  pieces = color == 0 ? ['P', 'N', 'B', 'R', 'Q', 'K'] : ['p', 'n', 'b', 'r', 'q', 'k'];
         _pieceCoverage[color] = 0UL;
-        
-        for (int i = 0; i < pieces.Length - 1; i++)
-            _pieceCoverage[color] |= _moveGenerators[char.ToLower(pieces[i])](_bitboards[pieces[i]], color, true, 0);
+        _pieceAttack[color] = 0UL;
+
+        for (int i = 0; i < 5; i++)
+            _pieceCoverage[color] |= _moveGenerators[char.ToLower(Pieces[color, i])](_bitboards[Pieces[color, i]], color, true, 0);
         if (kingCoverage)
             SetKingCoverage();
     }
@@ -252,3 +197,51 @@ public partial class Chess
     }
 }
 }
+
+
+    // public Move GetBestMoveParallel(int maxDepth)
+    // {
+    //     List<Move> allMoves = GetAllPossibleMoves(_turn);
+    //     if (allMoves.Count == 0)
+    //     {
+    //         int color = _turn == 'w' ? 0 : 1;
+    //         if (_checkBy[color].Count == 0)
+    //             return new('+', 0UL, 0UL); // Stalemate
+    //         else
+    //             return new('-', 0UL, 0UL); // Checkmate
+    //     }
+    //     int alpha = int.MinValue;
+    //     int beta = int.MaxValue;
+    //     Move bestMove = new('-', 0UL, 0UL);
+    //     int bestScore = _turn == 'w' ? int.MinValue : int.MaxValue;
+    //     int[] scores = new int[allMoves.Count];
+    //     Chess[] boards = new Chess[allMoves.Count];
+
+    //     for (int i = 0; i < allMoves.Count; i++)
+    //         boards[i] = new Chess(this);
+    //     Parallel.For(0, allMoves.Count, i =>
+    //     {
+    //         boards[i].ApplyMove(allMoves[i]);
+    //         scores[i] = boards[i].NegaMax(maxDepth - 1, alpha, beta);
+    //     });
+    //     int totalPossibleMoves = _possibleMove;
+    //     for (int i = 0; i < allMoves.Count; i++)
+    //     {
+    //         totalPossibleMoves += boards[i]._possibleMove;
+    //         if (_turn == 'w' && scores[i] > bestScore)
+    //         {
+    //             bestScore = scores[i];
+    //             bestMove = allMoves[i];
+    //             alpha = Math.Max(alpha, bestScore);
+    //         }
+    //         else if (_turn == 'b' && scores[i] < bestScore)
+    //         {
+    //             bestScore = scores[i];
+    //             bestMove = allMoves[i];
+    //             beta = Math.Min(beta, bestScore);
+    //         }
+    //     }
+    //     Console.WriteLine($"Total possible moves: {totalPossibleMoves}");
+    //     return bestMove;
+    // }
+
