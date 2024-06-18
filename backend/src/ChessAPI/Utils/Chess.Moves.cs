@@ -8,14 +8,15 @@ public partial class Chess
     private Dictionary<string, List<string>>[] _moves = [[], []];
     private Dictionary<ulong, ulong>[] _movesBitboard = [[], []];
 
-    private ulong GeneratePawnMoves(ulong bitboard, int color, bool isCoverage, int constraint)
+    private ulong[] GeneratePawnMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         ulong moves = 0UL;
+        ulong capture = 0UL;
         if (isCoverage)
         {
             ulong diagonal = PawnAttack[color,0](bitboard) | PawnAttack[color,1](bitboard);
             _pieceAttack[color] |=  diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
-            return diagonal & ~_fullBitboard[color ^ 1];
+            return [diagonal & ~_fullBitboard[color ^ 1], 0UL];
         }
         if (constraint < 2)
         {
@@ -24,29 +25,31 @@ public partial class Chess
             moves = PawnDirection[color](bitboard) & _emptyBitboard;
             moves |= PawnDirection[color](moves) & _emptyBitboard & RankMasks[3 + color];
             if (constraint == 0)
-                moves |= diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
+                capture |= diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
         }
 
-        return moves;
+        return [moves, capture];
     }
 
-    private ulong GenerateKnightMoves(ulong bitboard, int color, bool isCoverage, int constraint)
+    private ulong[] GenerateKnightMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         if (constraint != 0)
-            return 0UL;
+            return [0UL, 0UL];
 
         ulong knightMoves = KnightMoves(bitboard);
 
         if (isCoverage)
+        {
             _pieceAttack[color] |= knightMoves & _fullBitboard[color ^ 1];
-        knightMoves &= _emptyBitboard | _fullBitboard[color ^ 1];
-
-        return knightMoves;
+            return [knightMoves & ~_fullBitboard[color ^ 1], 0UL];
+        }
+        return [knightMoves & _emptyBitboard, knightMoves & _fullBitboard[color ^ 1]];
     }
 
-    private ulong IterDir(ulong bitboard, int color, bool isCoverage, int start, int finish)
+    private ulong[] IterDir(ulong bitboard, int color, bool isCoverage, int start, int finish)
     {
         ulong moves = 0UL;
+        ulong capture = 0UL;
 
         for (int i = start; i < finish; i++)
         {
@@ -71,52 +74,54 @@ public partial class Chess
                     direction = QueenDirections[i](direction);
                 }
                 if ((direction & _fullBitboard[color ^ 1]) != 0)
-                    moves |= direction;
+                    capture |= direction & _fullBitboard[color ^ 1];
             }
         }
-        return moves;
+        return [moves, capture];
     }
 
-    private ulong GenerateBishopMoves(ulong bitboard, int color, bool isCoverage, int constraint)
+    private ulong[] GenerateBishopMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         if (constraint != 0)
         {
             if (constraint > 4)
-                return 0UL;
+                return [0UL, 0UL];
             return IterDir(bitboard, color, isCoverage, constraint - 1, constraint + 1);
         }
         return IterDir(bitboard, color, isCoverage, 0, 4);
 
     }
 
-    private ulong GenerateRookMoves(ulong bitboard, int color, bool isCoverage, int constraint)
+    private ulong[] GenerateRookMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         if (constraint != 0)
         {
             if (constraint < 4)
-                return 0UL;
+                return [0UL, 0UL];
             return IterDir(bitboard, color, isCoverage, constraint - 1, constraint + 1);
         }
         return IterDir(bitboard, color, isCoverage, 4, 8);
     }
 
-    private ulong GenerateQueenMoves(ulong bitboard, int color, bool isCoverage, int constraint)
+    private ulong[] GenerateQueenMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         if (constraint != 0)
             return IterDir(bitboard, color, isCoverage, constraint - 1, constraint + 1);
         return IterDir(bitboard, color, isCoverage, 0, 8);
     }
 
-    private ulong GenerateKingMoves(ulong bitboard, int color, bool isCoverage, int constraint)
+    private ulong[] GenerateKingMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         ulong kingMoves = North(bitboard) | South(bitboard) | East(bitboard) | West(bitboard) | NorthEast(bitboard) | NorthWest(bitboard) | SouthEast(bitboard) | SouthWest(bitboard);
-        kingMoves &= (_emptyBitboard | _fullBitboard[color ^ 1]) & ~_pieceCoverage[color ^ 1];
+        // kingMoves &= (_emptyBitboard | _fullBitboard[color ^ 1]) & ~_pieceCoverage[color ^ 1];
+        ulong moves = kingMoves & _emptyBitboard & ~_pieceCoverage[color ^ 1];
+        ulong capture = kingMoves & _fullBitboard[color ^ 1] & ~_pieceCoverage[color ^ 1];
 
         if (_castle[color, 0] && ((CastleSpace[color, 0] & _emptyBitboard & ~_pieceCoverage[color ^ 1]) == CastleSpace[color, 0]))
-            kingMoves |= bitboard << 2;
+            moves |= bitboard << 2;
         if (_castle[color, 1] && ((CastleSpace[color, 1] & _emptyBitboard & ~_pieceCoverage[color ^ 1]) == CastleSpace[color, 1]))
-            kingMoves |= bitboard >> 2;
-        return kingMoves;
+            moves |= bitboard >> 2;
+        return [moves, capture];
     }
 
     private int AxisConstraint(ulong pieceBitboard, int color)

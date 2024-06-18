@@ -25,14 +25,18 @@ public partial class Chess
     private bool[,]         _castle = {{false,false}, {false,false}};
     private int             _halfmove;
     private int             _fullmove;
-    private int            _timeLimitMillis = 1000;
-    private int            _maxDepth = 5;
-    private readonly Dictionary<char, Func<ulong, int, bool, int, ulong>> _moveGenerators;
-
+    private int             _timeLimitMillis = 1000;
+    private int             _maxDepth = 5;
+    private int             _currentDepth = 3;
+    private Move            _currentBestMove = new('-', 0UL, 0UL);
+    private int             _currentBestScore = 0;
+    private readonly Dictionary<char, Func<ulong, int, bool, int, ulong[]>> _moveGenerators;
+    private Move            _bestMove = new('-', 0UL, 0UL);
+    private int             _bestScore = 0;
     public Chess(string fen = Fen)
     {
         IsValidFen(fen);
-        _moveGenerators = new Dictionary<char, Func<ulong, int, bool, int, ulong>>
+        _moveGenerators = new Dictionary<char, Func<ulong, int, bool, int, ulong[]>>
         {
             {'p', GeneratePawnMoves},
             {'n', GenerateKnightMoves},
@@ -162,6 +166,7 @@ public partial class Chess
 
         _pieceCoverage[0] |= whiteKingAdjancent & ~_fullBitboard[1];
         _pieceCoverage[1] |= blackKingAdjancent & ~_fullBitboard[0];
+
         _pieceAttack[0] |= whiteKingAdjancent & _fullBitboard[1] & ~_pieceCoverage[1];
         _pieceAttack[1] |= blackKingAdjancent & _fullBitboard[0] & ~_pieceCoverage[0];
     }
@@ -172,7 +177,8 @@ public partial class Chess
         _pieceAttack[color] = 0UL;
 
         for (int i = 0; i < 5; i++)
-            _pieceCoverage[color] |= _moveGenerators[char.ToLower(Pieces[color, i])](_bitboards[Pieces[color, i]], color, true, 0);
+            _pieceCoverage[color] |= _moveGenerators[char.ToLower(Pieces[color, i])](_bitboards[Pieces[color, i]], color, true, 0)[0];
+
         if (kingCoverage)
             SetKingCoverage();
     }

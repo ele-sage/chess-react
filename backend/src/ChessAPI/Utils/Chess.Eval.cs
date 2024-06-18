@@ -6,10 +6,54 @@ namespace ChessAPI
 // Chess.Evaluate.cs
 public partial class Chess
 {
+    private int PeSTO_Eval()
+    {
+        int[] mg = new int[2];
+        int[] eg = new int[2];
+        int gamePhase = 0;
+        
+        for (int color = 0; color < 2; color++)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                char piece = Pieces[color, i];
+                ulong bitboard = _bitboards[piece];
+                while (bitboard != 0)
+                {
+                    ulong piecePos = bitboard & ~(bitboard - 1);
+                    int pieceIndex = BitOperations.TrailingZeroCount(piecePos);
+                    if ((_pieceCoverage[color ^ 1] & (1UL << pieceIndex)) != 0)
+                    {
+                        mg[color] += ChessConstants.mg_table[i + color * 6, pieceIndex] / 3;
+                        eg[color] += ChessConstants.eg_table[i + color * 6, pieceIndex] / 3;
+                    }
+                    else
+                    {
+                        mg[color] += ChessConstants.mg_table[i + color * 6, pieceIndex];
+                        eg[color] += ChessConstants.eg_table[i + color * 6, pieceIndex];
+                    }
+                    gamePhase += ChessConstants.gamephaseInc[i + color * 6];
+                    bitboard &= bitboard - 1;
+                }
+            }
+        }
+        _possibleMove++;
+        int c = _turn == 'w' ? 0 : 1;
+        int mgScore = mg[c] - mg[c ^ 1];
+        int egScore = eg[c] - eg[c ^ 1];
+        int mgPhase = gamePhase;
+        if (mgPhase > 24)
+            mgPhase = 24;
+        int egPhase = 24 - mgPhase;
+
+        int score = (mgScore * mgPhase + egScore * egPhase) / 24;
+        return _turn == 'w' ? score : -score;
+    }
+
+
     private int Evaluate()
     {
         int score = 0;
-        // SetCoverage(_turn == 'w' ? 1 : 0);
         for (int i = 0; i < 6; i++)
         {
             char piece = Pieces[0, i];
@@ -19,8 +63,7 @@ public partial class Chess
                 ulong piecePos = bitboard & ~(bitboard - 1);
                 int pieceIndex = BitOperations.TrailingZeroCount(piecePos);
                 int pieceValue = PieceValues[i];
-                if ((_pieceCoverage[1] & (1UL << pieceIndex)) != 0)
-                    pieceValue >>= 1;
+
                 score += pieceValue + PieceSquareTables[i][pieceIndex];
                 bitboard &= bitboard - 1;
             }
@@ -35,7 +78,7 @@ public partial class Chess
                 int pieceIndex = BitOperations.TrailingZeroCount(piecePos);
                 int pieceValue = PieceValues[i];
                 if ((_pieceCoverage[0] & (1UL << pieceIndex)) != 0)
-                    pieceValue >>= 1;
+                    pieceValue = pieceValue * 2 / 3;
                 score -= pieceValue + PieceSquareTables[i][63 - pieceIndex];
                 bitboard &= bitboard - 1;
             }
@@ -44,12 +87,15 @@ public partial class Chess
         return score;
     }
 
+
+
     private int AlphaBeta(int depth, int alpha, int beta, bool isMaximizingPlayer, Stopwatch stopwatch)
     {
-        if (depth == 0)
+        if (depth == 0 || stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
+        {
+            // return PeSTO_Eval();
             return Evaluate();
-        if (stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
-            return isMaximizingPlayer ? int.MinValue : int.MaxValue;
+        }
         ulong hash = ComputeHash();
         if (_transpositionTable.TryGetValue(hash, out var entry) && entry.depth >= depth)
         {
@@ -59,53 +105,69 @@ public partial class Chess
                 alpha = Math.Max(alpha, entry.value);
             else
                 beta = Math.Min(beta, entry.value);
+
             if (alpha >= beta)
                 return entry.value;
         }
+
         int color = _turn == 'w' ? 0 : 1;
-        List<Move> moves = GetAllPossibleMoves(_turn);
-        if (moves.Count == 0)
+        Move[] moves = GetAllPossibleMoves(_turn);
+        if (moves.Length == 0)
         {
             if (_checkBy[color].Count == 0)
                 return 0; // Stalemate
             else
                 return isMaximizingPlayer ? int.MinValue : int.MaxValue; // Checkmate
         }
+
+        int bestScore = isMaximizingPlayer ? int.MinValue : int.MaxValue;
         ulong enPassantMask = _enPassantMask;
-        ulong[] fullBitboard = { _fullBitboard[0], _fullBitboard[1] };
-        bool[,] castle = { { _castle[0, 0], _castle[0, 1] }, { _castle[1, 0], _castle[1, 1] } };
-        int[,] kingPos = { { _kingPos[0, 0], _kingPos[0, 1] }, { _kingPos[1, 0], _kingPos[1, 1] } };
+        ulong[] fullBitboard = [_fullBitboard[0], _fullBitboard[1]];
+        bool[,] castle = {{ _castle[0, 0], _castle[0, 1] }, { _castle[1, 0], _castle[1, 1] }};
+        int[,] kingPos = {{ _kingPos[0, 0], _kingPos[0, 1] }, { _kingPos[1, 0], _kingPos[1, 1] }};
         ulong pinnedToKing = _pinnedToKing[color];
-        if (isMaximizingPlayer)
+        
+
+        foreach (Move move in moves)
         {
-            int value = int.MinValue;
-            foreach (Move move in moves)
+            ApplyMove(move);
+            int score = AlphaBeta(depth - 1, alpha, beta, !isMaximizingPlayer, stopwatch);
+            UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing);
+
+            if (isMaximizingPlayer)
             {
-                ApplyMove(move);
-                value = Math.Max(value, AlphaBeta(depth - 1, alpha, beta, false, stopwatch));
-                alpha = Math.Max(alpha, value);
-                UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing);
-                if (alpha >= beta)
-                    break;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    if (depth == _currentDepth)
+                    {
+                        _currentBestMove = move;
+                        _currentBestScore = bestScore;
+                    }
+                }
+                alpha = Math.Max(alpha, bestScore);
             }
-            _transpositionTable.Store(hash, depth, value, value <= alpha ? TranspositionTable.UPPERBOUND : TranspositionTable.EXACT);
-            return value;
-        }
-        else
-        {
-            int value = int.MaxValue;
-            foreach (Move move in moves)
+            else
             {
-                ApplyMove(move);
-                value = Math.Min(value, AlphaBeta(depth - 1, alpha, beta, true, stopwatch));
-                beta = Math.Min(beta, value);
-                UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing);
-                if (alpha >= beta)
-                    break;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    if (depth == _currentDepth)
+                    {
+                        _currentBestMove = move;
+                        _currentBestScore = bestScore;
+                    }
+                }
+                beta = Math.Min(beta, bestScore);
             }
-            _transpositionTable.Store(hash, depth, value, value >= beta ? TranspositionTable.LOWERBOUND : TranspositionTable.EXACT);
-            return value;
+
+            if (alpha >= beta)
+                break;
         }
+
+        _transpositionTable.Store(hash, depth, bestScore, bestScore <= alpha ? TranspositionTable.UPPERBOUND : (bestScore >= beta ? TranspositionTable.LOWERBOUND : TranspositionTable.EXACT));
+        return bestScore;
+
     }
 
     private void ApplyMove(Move move)

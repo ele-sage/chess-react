@@ -224,8 +224,8 @@ public partial class Chess
     public List<string> GetPossibleMoves()
     {
         List<string> legalMoves = [];
-        List<Move> moves = GetAllPossibleMoves(_turn);
-        foreach (var move in moves)
+        Move[] moves = GetAllPossibleMoves(_turn);
+        foreach (Move move in moves)
         {
             string moveSerialized = $"{BitboardToSquare(move.From)} {BitboardToSquare(move.To)} {move.Piece}";
             // Console.WriteLine(moveSerialized);
@@ -234,7 +234,7 @@ public partial class Chess
         return legalMoves;
     }
 
-    public List<string> DoTurn(int maxDepth = 5, int maxTime = 1000)
+    public List<string> DoTurn(int maxDepth = 6, int maxTime = 500)
     {
         _timeLimitMillis = maxTime;
         _maxDepth = maxDepth;
@@ -245,6 +245,7 @@ public partial class Chess
         Stopwatch sw = new();
         sw.Start();
         Move bestMove = IterativeDeepening();
+
         sw.Stop();
         Console.WriteLine($"Execution Time: {sw.ElapsedMilliseconds}ms");
         if (bestMove.Piece == 'P' || bestMove.Piece == 'p' || (bestMove.To & (_fullBitboard[color ^ 1] | _enPassantMask)) != 0)
@@ -259,8 +260,8 @@ public partial class Chess
         else if (bestMove.Piece == '+' )
             legalMoves.Add("Checkmate");
         ApplyMove(bestMove);
-        List<Move> moves = GetAllPossibleMoves(_turn);
-        foreach (var move in moves)
+        Move[] moves = GetAllPossibleMoves(_turn);
+        foreach (Move move in moves)
         {
             string moveSerialized = $"{BitboardToSquare(move.From)} {BitboardToSquare(move.To)} {move.Piece}";
             Console.WriteLine(moveSerialized);

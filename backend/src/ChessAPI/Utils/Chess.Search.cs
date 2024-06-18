@@ -7,77 +7,38 @@ public partial class Chess
 {
     private Move IterativeDeepening()
     {
+        _maxDepth = 6;
+        _timeLimitMillis = 1000;
+
         Stopwatch stopwatch = new();
         stopwatch.Start();
-        Move bestMove = new('-', 0UL, 0UL);
-        int bestScore = int.MinValue;
+        bool isMaximizingPlayer = _turn == 'w';
+
         for (int depth = 3; depth <= _maxDepth; depth++)
         {
+            _currentDepth = depth;
+            AlphaBeta(depth, int.MinValue, int.MaxValue, isMaximizingPlayer, stopwatch);
+
             if (stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
                 break;
-            (Move move, int score) = GetBestMove(depth, stopwatch);
-            if (score > bestScore)
-            {
-                bestScore = score;
-                bestMove = move;
-            }
+            _bestMove = _currentBestMove;
+            _bestScore = _currentBestScore;
         }
+        if (isMaximizingPlayer)
+        {
+            if (_currentBestScore > _bestScore)
+                _bestMove = _currentBestMove;
+        }
+        else
+        {
+            if (_currentBestScore < _bestScore)
+                _bestMove = _currentBestMove;
+        }
+        stopwatch.Stop();
+        Console.WriteLine($"Depth: {_currentDepth}");
         Console.WriteLine($"Possible moves: {_possibleMove}");
-        return bestMove;
+        return _bestMove;
     }
-
-    private (Move move, int score) GetBestMove(int depth, Stopwatch stopwatch)
-    {
-        bool isMaximizingPlayer = _turn == 'w';
-        int alpha = int.MinValue;
-        int beta = int.MaxValue;
-        int bestScore = isMaximizingPlayer ? int.MinValue : int.MaxValue;
-        Move bestMove = new('-', 0UL, 0UL);
-        List<Move> allMoves = GetAllPossibleMoves(_turn);
-        int color = _turn == 'w' ? 0 : 1;
-
-        if (allMoves.Count == 0)
-        {
-            if (_checkBy[color].Count == 0)
-                return (new('-', 0UL, 0UL), 0); // Stalemate
-            else
-                return (new('+', 0UL, 0UL), isMaximizingPlayer ? int.MinValue : int.MaxValue); // Checkmate
-        }
-
-        ulong enPassantMask = _enPassantMask;
-        ulong[] fullBitboard = [_fullBitboard[0], _fullBitboard[1]];
-        bool[,] castle = { { _castle[0, 0], _castle[0, 1] }, { _castle[1, 0], _castle[1, 1] } };
-        int[,] kingPos = { { _kingPos[0, 0], _kingPos[0, 1] }, { _kingPos[1, 0], _kingPos[1, 1] } };
-        ulong pinnedToKing = _pinnedToKing[color];
-
-        foreach (Move move in allMoves)
-        {
-            if (stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
-                break;
-
-            ApplyMove(move);
-            int score = AlphaBeta(depth - 1, alpha, beta, !isMaximizingPlayer, stopwatch);
-            UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing, true);
-
-            if (isMaximizingPlayer && score > bestScore)
-            {
-                bestScore = score;
-                bestMove = move;
-                alpha = Math.Max(alpha, bestScore);
-            }
-            else if (!isMaximizingPlayer && score < bestScore)
-            {
-                bestScore = score;
-                bestMove = move;
-                beta = Math.Min(beta, bestScore);
-            }
-
-            if (alpha >= beta)
-                break;
-        }
-        return (bestMove, bestScore);
-    }
- 
 
     private static List<Move> GetMoves(ulong from, ulong moves, char piece)
     {
@@ -92,10 +53,11 @@ public partial class Chess
         return moveList;
     }
 
-    private List<Move> GetAllPossibleMoves(char turn)
+    private Move[] GetAllPossibleMoves(char turn)
     {
         int color = turn == 'w' ? 0 : 1;
-        List<Move> allMoves = [];
+        List<Move> moves = [];
+        List<Move> attacks = [];
 
         SetFullBitboard(color);
         SetFullBitboard(color ^ 1);
@@ -116,24 +78,37 @@ public partial class Chess
             {
                 ulong pieceBitboard = piecesMask & ~(piecesMask - 1);
                 piecesMask &= piecesMask - 1;
-                ulong movesBitboards;
+
                 if (_checkBy[color].Count == 2 && pieceKey != 'k')
-                    movesBitboards = 0UL;
+                {
+                    continue;
+                }
                 else
                 {
                     int constraint = AxisConstraint(pieceBitboard, color);
-                    movesBitboards = _moveGenerators[pieceKey](pieceBitboard, color, false, constraint);
+                    ulong[] movesAttacks = _moveGenerators[pieceKey](pieceBitboard, color, false, constraint);
 
                     if (_checkBy[color].Count == 1 && pieceKey != 'k')
-                        movesBitboards &= _checkBy[color].ElementAt(0).Value;
-                }
-                if (movesBitboards > 0)
-                {
-                    allMoves.AddRange(GetMoves(pieceBitboard, movesBitboards, Pieces[color, i]));
+                    {
+                        movesAttacks[0] &= _checkBy[color].ElementAt(0).Value;
+                        movesAttacks[1] &= _checkBy[color].ElementAt(0).Value;
+                    }
+                    moves.AddRange(GetMoves(pieceBitboard, movesAttacks[0], Pieces[color, i]));
+                    attacks.AddRange(GetMoves(pieceBitboard, movesAttacks[1], Pieces[color, i]));
+
+                    // moves.InsertRange(0, GetMoves(pieceBitboard, movesAttacks[0] & ~_pieceCoverage[color ^ 1], Pieces[color, i]));
+                    // moves.AddRange(GetMoves(pieceBitboard, movesAttacks[0] & _pieceCoverage[color ^ 1], Pieces[color, i]));
+                    // attacks.InsertRange(0, GetMoves(pieceBitboard, movesAttacks[1] & ~_pieceCoverage[color ^ 1], Pieces[color, i]));
+                    // attacks.AddRange(GetMoves(pieceBitboard, movesAttacks[1] & _pieceCoverage[color ^ 1], Pieces[color, i]));
+
+                    // moves.InsertRange(0, GetMoves(pieceBitboard, movesAttacks[1] & _pieceCoverage[color ^ 1], Pieces[color, i]));
+                    // moves.AddRange(GetMoves(pieceBitboard, movesAttacks[0] & _pieceCoverage[color ^ 1], Pieces[color, i]));
+                    // attacks.InsertRange(0, GetMoves(pieceBitboard, movesAttacks[1] & ~_pieceCoverage[color ^ 1], Pieces[color, i]));
+                    // attacks.AddRange(GetMoves(pieceBitboard, movesAttacks[0] & ~_pieceCoverage[color ^ 1], Pieces[color, i]));
                 }
             }
         }
-        return allMoves;
+        return [.. attacks, .. moves];
     }
 }
 // A simple move representation
