@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Diagnostics;
 
 namespace ChessAPI
 {
@@ -43,10 +44,12 @@ public partial class Chess
         return score;
     }
 
-    private int AlphaBeta(int depth, int alpha, int beta, bool isMaximizingPlayer)
+    private int AlphaBeta(int depth, int alpha, int beta, bool isMaximizingPlayer, Stopwatch stopwatch)
     {
         if (depth == 0)
             return Evaluate();
+        if (stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
+            return isMaximizingPlayer ? int.MinValue : int.MaxValue;
         ulong hash = ComputeHash();
         if (_transpositionTable.TryGetValue(hash, out var entry) && entry.depth >= depth)
         {
@@ -79,7 +82,7 @@ public partial class Chess
             foreach (Move move in moves)
             {
                 ApplyMove(move);
-                value = Math.Max(value, AlphaBeta(depth - 1, alpha, beta, false));
+                value = Math.Max(value, AlphaBeta(depth - 1, alpha, beta, false, stopwatch));
                 alpha = Math.Max(alpha, value);
                 UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing);
                 if (alpha >= beta)
@@ -94,7 +97,7 @@ public partial class Chess
             foreach (Move move in moves)
             {
                 ApplyMove(move);
-                value = Math.Min(value, AlphaBeta(depth - 1, alpha, beta, true));
+                value = Math.Min(value, AlphaBeta(depth - 1, alpha, beta, true, stopwatch));
                 beta = Math.Min(beta, value);
                 UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing);
                 if (alpha >= beta)

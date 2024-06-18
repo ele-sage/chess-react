@@ -25,6 +25,8 @@ public partial class Chess
     private bool[,]         _castle = {{false,false}, {false,false}};
     private int             _halfmove;
     private int             _fullmove;
+    private int            _timeLimitMillis = 1000;
+    private int            _maxDepth = 5;
     private readonly Dictionary<char, Func<ulong, int, bool, int, ulong>> _moveGenerators;
 
     public Chess(string fen = Fen)

@@ -234,15 +234,17 @@ public partial class Chess
         return legalMoves;
     }
 
-    public List<string> DoTurn()
+    public List<string> DoTurn(int maxDepth = 5, int maxTime = 1000)
     {
+        _timeLimitMillis = maxTime;
+        _maxDepth = maxDepth;
         int color = _turn == 'w' ? 0 : 1;
         List<string> legalMoves = [];
 
         // execution time
         Stopwatch sw = new();
         sw.Start();
-        Move bestMove = GetBestMove(5);
+        Move bestMove = IterativeDeepening();
         sw.Stop();
         Console.WriteLine($"Execution Time: {sw.ElapsedMilliseconds}ms");
         if (bestMove.Piece == 'P' || bestMove.Piece == 'p' || (bestMove.To & (_fullBitboard[color ^ 1] | _enPassantMask)) != 0)

@@ -1,12 +1,32 @@
-using System.Collections.Concurrent;
-using System.Numerics;
+using System.Diagnostics;
 
 namespace ChessAPI
 {
 // Chess.Evaluate.cs
 public partial class Chess
 {
-    public Move GetBestMove(int maxDepth)
+    private Move IterativeDeepening()
+    {
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+        Move bestMove = new('-', 0UL, 0UL);
+        int bestScore = int.MinValue;
+        for (int depth = 3; depth <= _maxDepth; depth++)
+        {
+            if (stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
+                break;
+            (Move move, int score) = GetBestMove(depth, stopwatch);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestMove = move;
+            }
+        }
+        Console.WriteLine($"Possible moves: {_possibleMove}");
+        return bestMove;
+    }
+
+    private (Move move, int score) GetBestMove(int depth, Stopwatch stopwatch)
     {
         bool isMaximizingPlayer = _turn == 'w';
         int alpha = int.MinValue;
@@ -15,25 +35,30 @@ public partial class Chess
         Move bestMove = new('-', 0UL, 0UL);
         List<Move> allMoves = GetAllPossibleMoves(_turn);
         int color = _turn == 'w' ? 0 : 1;
+
         if (allMoves.Count == 0)
         {
             if (_checkBy[color].Count == 0)
-                return new('+', 0UL, 0UL); // Stalemate
+                return (new('-', 0UL, 0UL), 0); // Stalemate
             else
-                return new('-', 0UL, 0UL); // Checkmate
+                return (new('+', 0UL, 0UL), isMaximizingPlayer ? int.MinValue : int.MaxValue); // Checkmate
         }
+
         ulong enPassantMask = _enPassantMask;
         ulong[] fullBitboard = [_fullBitboard[0], _fullBitboard[1]];
         bool[,] castle = { { _castle[0, 0], _castle[0, 1] }, { _castle[1, 0], _castle[1, 1] } };
         int[,] kingPos = { { _kingPos[0, 0], _kingPos[0, 1] }, { _kingPos[1, 0], _kingPos[1, 1] } };
         ulong pinnedToKing = _pinnedToKing[color];
 
-        PrintAllFieldsToFile("original");
         foreach (Move move in allMoves)
         {
+            if (stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
+                break;
+
             ApplyMove(move);
-            int score = AlphaBeta(maxDepth - 1, alpha, beta, !isMaximizingPlayer);
+            int score = AlphaBeta(depth - 1, alpha, beta, !isMaximizingPlayer, stopwatch);
             UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing, true);
+
             if (isMaximizingPlayer && score > bestScore)
             {
                 bestScore = score;
@@ -50,10 +75,9 @@ public partial class Chess
             if (alpha >= beta)
                 break;
         }
-        PrintAllFieldsToFile("final");
-        Console.WriteLine($"Possible moves: {_possibleMove}");
-        return bestMove;
-    }   
+        return (bestMove, bestScore);
+    }
+ 
 
     private static List<Move> GetMoves(ulong from, ulong moves, char piece)
     {
