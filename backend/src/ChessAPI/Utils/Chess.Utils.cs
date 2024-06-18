@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Diagnostics;
 
 namespace ChessAPI
 {
@@ -220,14 +221,30 @@ public partial class Chess
         return board;
     }
 
+    public List<string> GetPossibleMoves()
+    {
+        List<string> legalMoves = [];
+        List<Move> moves = GetAllPossibleMoves(_turn);
+        foreach (var move in moves)
+        {
+            string moveSerialized = $"{BitboardToSquare(move.From)} {BitboardToSquare(move.To)} {move.Piece}";
+            // Console.WriteLine(moveSerialized);
+            legalMoves.Add(moveSerialized);
+        }
+        return legalMoves;
+    }
 
     public List<string> DoTurn()
     {
         int color = _turn == 'w' ? 0 : 1;
         List<string> legalMoves = [];
 
+        // execution time
+        Stopwatch sw = new();
+        sw.Start();
         Move bestMove = GetBestMove(5);
-
+        sw.Stop();
+        Console.WriteLine($"Execution Time: {sw.ElapsedMilliseconds}ms");
         if (bestMove.Piece == 'P' || bestMove.Piece == 'p' || (bestMove.To & (_fullBitboard[color ^ 1] | _enPassantMask)) != 0)
             _halfmove = 0;
         else

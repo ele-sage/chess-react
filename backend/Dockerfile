@@ -18,6 +18,6 @@ EXPOSE 5000
 RUN dotnet dev-certs https --trust
 
 # Set the entry point for the development server
-CMD ["dotnet", "watch", "run", "--urls", "https://0.0.0.0:5000"]
+CMD ["dotnet", "watch", "run", "--urls", "http://0.0.0.0:5000"]
 # dotnet watch run --urls https://0.0.0.0:5000
 # CMD ["tail", "-f", "/dev/null"]

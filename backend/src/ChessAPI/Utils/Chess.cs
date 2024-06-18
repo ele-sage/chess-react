@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace ChessAPI
 {
 // Chess.cs
@@ -27,6 +29,7 @@ public partial class Chess
 
     public Chess(string fen = Fen)
     {
+        IsValidFen(fen);
         _moveGenerators = new Dictionary<char, Func<ulong, int, bool, int, ulong>>
         {
             {'p', GeneratePawnMoves},
@@ -194,6 +197,60 @@ public partial class Chess
         _kingPos[0,1] = whiteKingPos[1];
         _kingPos[1,0] = blackKingPos[0];
         _kingPos[1,1] = blackKingPos[1];
+    }
+
+    private static void IsValidFen(string fen)
+    {
+        const string FEN_SYNTAX = "\nFEN Syntax ::=  `<Piece Placement> <Side to move> <Castling Rights> <En passant target square> <Halfmove clock> <Fullmove counter>`";
+        const string PIECE_PLACEMENT = "\n<Piece Placement> ::= <rank8>'/'<rank7>'/'<rank6>'/'<rank5>'/'<rank4>'/'<rank3>'/'<rank2>'/'<rank1>\n<ranki>       ::= [<digit17>]<piece> {[<digit17>]<piece>} [<digit17>] | '8' +\n<piece>       ::= <white Piece> | <black Piece>\n<digit17>     ::= '1' | '2' | '3' | '4' | '5' | '6' | '7'\n<white Piece> ::= 'P' | 'N' | 'B' | 'R' | 'Q' | 'K'\n<black Piece> ::= 'p' | 'n' | 'b' | 'r' | 'q' | 'k'";
+        const string SIDE_TO_MOVE = "\n<Side to move> ::= {'w' | 'b'}";
+        const string CASTLING_RIGHTS = "\n<Castling Rights> ::= '-' | ['K'] ['Q'] ['k'] ['q'] (1..4)";
+        const string EN_PASSANT = "\n<En passant target square> ::= '-' | <epsquare>\n<epsquare>   ::= <fileLetter> <eprank>\n<fileLetter> ::= 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h'\n<eprank>     ::= '3' | '6'";
+        const string HALFMOVE_CLOCK = "\n<Halfmove clock> ::= <digit> {<digit>}\n<digit>         ::= '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'";
+        const string FULLMOVE_COUNTER = "\n<Fullmove counter> ::= <digit> {<digit>}\n<digit>           ::= '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'";
+        const string FEN_FORMAT = FEN_SYNTAX + PIECE_PLACEMENT + SIDE_TO_MOVE + CASTLING_RIGHTS + EN_PASSANT + HALFMOVE_CLOCK + FULLMOVE_COUNTER;
+        const string FEN_EXAMPLE = "\nExample: 4k2r/r3bppp/p1np4/1p1NpP2/2p1P3/6N1/PPKR2PP/4QB1R w k - 4 23\n         rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1.";
+        
+        string fenPattern = @"\s*^(((?:[rnbqkpRNBQKP1-8]+\/){7})[rnbqkpRNBQKP1-8]+)\s([b|w])\s([K|Q|k|q]{1,4}|-)\s([a-h][3|6]|-)\s(\d+)\s(\d+)\s*$";
+
+        // validate fen with regex
+        if (!Regex.IsMatch(fen, fenPattern))
+        {
+            throw new ArgumentException("FEN does not match the standard format." + FEN_FORMAT + FEN_EXAMPLE);
+        }
+
+        int i = 0, lineLength = 0;
+        int[] kings = [0, 0];
+        while (i < fen.Length && fen[i] != ' ')
+        {
+            if (fen[i] == 'k') kings[0]++;
+            else if (fen[i] == 'K') kings[1]++;
+            if (fen[i] == '/')
+            {
+                if (lineLength != 8)
+                {
+                    throw new ArgumentException("Each rank must have exactly 8 squares." + "\nCurrent rank: " + fen[(i - lineLength)..i] + "\nSize: " + lineLength);
+                }
+                lineLength = 0;
+            }
+            else if (char.IsDigit(fen[i]))
+            {
+                lineLength += int.Parse(fen[i].ToString());
+            }
+            else if (char.IsLetter(fen[i]))
+            {
+                lineLength++;
+            }
+            else
+            {
+                throw new ArgumentException("Invalid character in FEN string." + "\nCharacter: " + fen[i]);
+            }
+            i++;
+        }
+        if (kings[0] != 1 || kings[1] != 1)
+        {
+            throw new ArgumentException("Each player must have exactly one king." + "\nWhite kings: " + kings[1] + "\nBlack kings: " + kings[0]);
+        }
     }
 }
 }

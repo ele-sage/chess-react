@@ -18,6 +18,7 @@ public partial class Chess
 
     private static readonly ulong[,] CastleSpace = {{0x6000000000000000UL, 0x0E00000000000000UL},{0x0000000000000060UL, 0x000000000000000EUL}};
     private static readonly ulong[,] RookPositions = {{0x8000000000000000UL, 0x0100000000000000UL},{0x0000000000000080UL, 0x0000000000000001UL}};
+    private static readonly ulong[,] RookCastlePositions = {{0x2000000000000000UL, 0x0800000000000000UL},{0x0000000000000020UL, 0x0000000000000008UL}};
     private static ulong Self(ulong bitboard) => bitboard;
     private static ulong North(ulong bitboard) => bitboard >> Size;
     private static ulong South(ulong bitboard) => bitboard << Size;

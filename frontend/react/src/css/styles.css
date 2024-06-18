@@ -54,7 +54,8 @@ ul {
   visibility: hidden;
 }
 
-.board {
-  display: inline-grid;
-  grid-template-columns: repeat(8, 1fr);
+.chessboard {
+  display: flex;
+  flex-wrap: wrap;
+  width: 480px;
 }

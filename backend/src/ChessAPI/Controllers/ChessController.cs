@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Text.RegularExpressions;
 
 namespace ChessAPI.Controllers
 {
@@ -7,60 +6,38 @@ namespace ChessAPI.Controllers
     [ApiController]
     public class ChessController : ControllerBase
     {
-        private static bool IsValidFen(string fen)
-        {
-            string fenPattern = @"\s*^(((?:[rnbqkpRNBQKP1-8]+\/){7})[rnbqkpRNBQKP1-8]+)\s([b|w])\s([K|Q|k|q|-]{1,4})\s(-|[a-h][1-8])\s(\d+\s\d+)$";
-            // validate fen with regex
-            if (!Regex.IsMatch(fen, fenPattern))
-            {
-                return false;
-            }
-
-            int i = 0, lineLength = 0;
-            int[] kings = [0, 0];
-            while (i < fen.Length && fen[i] != ' ')
-            {
-                if (fen[i] == 'k') kings[0]++;
-                else if (fen[i] == 'K') kings[1]++;
-                if (fen[i] == '/')
-                {
-                    if (lineLength != 8)
-                    {
-                        return false;
-                    }
-                    lineLength = 0;
-                }
-                else if (char.IsDigit(fen[i]))
-                {
-                    lineLength += int.Parse(fen[i].ToString());
-                }
-                else if (char.IsLetter(fen[i]))
-                {
-                    lineLength++;
-                }
-                else
-                {
-                    return false;
-                }
-                i++;
-            }
-            if (kings[0] != 1 || kings[1] != 1)
-            {
-                return false;
-            }
-            return true;
-        }
+        // Based on the query string, chess engine will simply return the fen and legal moves
         [HttpGet]
-        public ActionResult Get([FromQuery] string fen = "")
+        public ActionResult GetLegalMoves([FromQuery] string fen = "")
         {
-            if (!IsValidFen(fen))
+            try
             {
-                return BadRequest("Invalid FEN");
+                Chess chess = new(fen);
+                List<string> legalMoves = chess.GetPossibleMoves();
+                string newFen = chess.GetFenFromBitboard();
+                return Ok(new { fen = newFen, legalMoves });
             }
-            Chess chess = new(fen);
-            List<string> legalMoves = chess.DoTurn();
-            string newFen = chess.GetFenFromBitboard();
-            return Ok(new { fen = newFen, legalMoves });
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        }
+
+        // Based on the query string, chess engine will make a move and return the new fen and legal moves
+        [HttpGet("bot/")]
+        public ActionResult GetBot([FromQuery] string fen = "")
+        {
+            try
+            {
+                Chess chess = new(fen);
+                List<string> legalMoves = chess.DoTurn();
+                string newFen = chess.GetFenFromBitboard();
+                return Ok(new { fen = newFen, legalMoves });
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
         }
     }
 }

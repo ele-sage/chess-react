@@ -1,5 +1,6 @@
 const SIZE = 8;
 const FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const FEN_PATTERN = /^\s*^(((?:[rnbqkpRNBQKP1-8]+\/){7})[rnbqkpRNBQKP1-8]+)\s([b|w])\s([K|Q|k|q]{1,4}|-)\s([a-h][3|6]|-)\s(\d+)\s(\d+)\s*$/;
 const PIECE = new Map([
   ['P', 0],
   ['N', 1],
@@ -15,211 +16,129 @@ const PIECE = new Map([
   ['k', 11],
 ]);
 
-function nextChar(c, iter = 1) {
-  return String.fromCharCode(c.charCodeAt(0) + iter);
-}
-
-function prevChar(c, iter = 1) {
-  return String.fromCharCode(c.charCodeAt(0) - iter);
-}
-
 class Chess {
-  constructor(fen) {
-    this.bitboards = new BigUint64Array(12);
-    this.fen = fen ? fen : FEN;
+  constructor(fen = FEN) {
+    this.board = new Map([["a1", 'R'], ["b1", 'N'], ["c1", 'B'], ["d1", 'Q'], ["e1", 'K'], ["f1", 'B'], ["g1", 'N'], ["h1", 'R'],
+                          ["a2", 'P'], ["b2", 'P'], ["c2", 'P'], ["d2", 'P'], ["e2", 'P'], ["f2", 'P'], ["g2", 'P'], ["h2", 'P'],
+                          ["a3", ' '], ["b3", ' '], ["c3", ' '], ["d3", ' '], ["e3", ' '], ["f3", ' '], ["g3", ' '], ["h3", ' '],
+                          ["a4", ' '], ["b4", ' '], ["c4", ' '], ["d4", ' '], ["e4", ' '], ["f4", ' '], ["g4", ' '], ["h4", ' '],
+                          ["a5", ' '], ["b5", ' '], ["c5", ' '], ["d5", ' '], ["e5", ' '], ["f5", ' '], ["g5", ' '], ["h5", ' '],
+                          ["a6", ' '], ["b6", ' '], ["c6", ' '], ["d6", ' '], ["e6", ' '], ["f6", ' '], ["g6", ' '], ["h6", ' '],
+                          ["a7", 'p'], ["b7", 'p'], ["c7", 'p'], ["d7", 'p'], ["e7", 'p'], ["f7", 'p'], ["g7", 'p'], ["h7", 'p'],
+                          ["a8", 'r'], ["b8", 'n'], ["c8", 'b'], ["d8", 'q'], ["e8", 'k'], ["f8", 'b'], ["g8", 'n'], ["h8", 'r']]);
+    this.fen = fen;
     this.turn = 'w';
-    this.castle = "";
-    this.enPassant = "";
+    this.castle = "KQkq";
+    this.enPassant = "-";
     this.halfmove = 0;
-    this.fullmove = 0;
-    this.initializeBoard();
-    this.pieces = new Map();
-    this.setPieces();
+    this.fullmove = 1;
+    if (fen !== FEN) this.initializeBoard();
   }
 
-  getPawnMoves(pos) {
-    const moves = [];
-    const direction = this.turn === 'w' ? 1 : -1;
-    const startRank = this.turn === 'w' ? 2 : 7;
-    const promotionRank = this.turn === 'w' ? 8 : 1;
-    const file = pos.charCodeAt(0);
-    const rank = parseInt(pos[1]);
-
-    // Single step forward
-    const singleStep = String.fromCharCode(file) + (rank + direction);
-    if (!this.pieces.has(singleStep)) moves.push(singleStep);
-
-    // Double step forward from starting position
-    if (rank === startRank) {
-      const doubleStep = String.fromCharCode(file) + (rank + 2 * direction);
-      if (!this.pieces.has(doubleStep)) moves.push(doubleStep);
+  isFenValid() {
+    if (!FEN_PATTERN.test(this.fen)) {
+      throw new Error("FEN does not match the standard format.");
     }
 
-    // Captures
-    const captures = [
-      String.fromCharCode(file - 1) + (rank + direction),
-      String.fromCharCode(file + 1) + (rank + direction)
-    ];
-    captures.forEach(target => {
-      if (this.pieces.has(target) && this.isEnemyPiece(target)) {
-        moves.push(target);
+    let i = 0, lineLength = 0;
+    let kings = [0, 0];
+    while (i < this.fen.length && this.fen[i] !== ' ') {
+      if (this.fen[i] === 'k') kings[0]++;
+      else if (this.fen[i] === 'K') kings[1]++;
+      if (this.fen[i] === '/') {
+        if (lineLength !== 8) {
+          throw new Error("Each rank must have exactly 8 squares.");
+        }
+        lineLength = 0;
+      } else if (this.fen[i] >= '1' && this.fen[i] <= '8') {
+        lineLength += parseInt(this.fen[i]);
+      } else if (this.fen[i].match(/[a-zA-Z]/)) {
+        lineLength++;
+      } else {
+        throw new Error("Invalid character in FEN string.");
       }
-    });
-
-    // Promotion
-    if (rank + direction === promotionRank) {
-      moves.forEach((move, index) => {
-        moves[index] = move + "=Q"; // You can handle different promotion pieces
-      });
+      i++;
     }
-
-    return moves;
-  }
-
-  getKnightMoves(pos) {
-    const moves = [];
-    const file = pos.charCodeAt(0);
-    const rank = parseInt(pos[1]);
-    const possibleMoves = [
-      [2, 1], [2, -1], [-2, 1], [-2, -1],
-      [1, 2], [1, -2], [-1, 2], [-1, -2]
-    ];
-
-    possibleMoves.forEach(([df, dr]) => {
-      const targetFile = String.fromCharCode(file + df);
-      const targetRank = rank + dr;
-      if (targetFile >= 'a' && targetFile <= 'h' && targetRank >= 1 && targetRank <= 8) {
-        const target = targetFile + targetRank;
-        if (!this.pieces.has(target) || this.isEnemyPiece(target)) {
-          moves.push(target);
-        }
-      }
-    });
-
-    return moves;
-  }
-
-  getBishopMoves(pos) {
-    return this.getSlidingMoves(pos, [[1, 1], [1, -1], [-1, 1], [-1, -1]]);
-  }
-
-  getRookMoves(pos) {
-    return this.getSlidingMoves(pos, [[1, 0], [-1, 0], [0, 1], [0, -1]]);
-  }
-
-  getQueenMoves(pos) {
-    return this.getSlidingMoves(pos, [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]]);
-  }
-
-  getKingMoves(pos) {
-    const moves = [];
-    const file = pos.charCodeAt(0);
-    const rank = parseInt(pos[1]);
-    const possibleMoves = [
-      [1, 0], [1, 1], [1, -1], [-1, 0], [-1, 1], [-1, -1], [0, 1], [0, -1]
-    ];
-
-    possibleMoves.forEach(([df, dr]) => {
-      const targetFile = String.fromCharCode(file + df);
-      const targetRank = rank + dr;
-      if (targetFile >= 'a' && targetFile <= 'h' && targetRank >= 1 && targetRank <= 8) {
-        const target = targetFile + targetRank;
-        if (!this.pieces.has(target) || this.isEnemyPiece(target)) {
-          moves.push(target);
-        }
-      }
-    });
-
-    return moves;
-  }
-
-  getSlidingMoves(pos, directions) {
-    const moves = [];
-    const file = pos.charCodeAt(0);
-    const rank = parseInt(pos[1]);
-
-    directions.forEach(([df, dr]) => {
-      let targetFile = file + df;
-      let targetRank = rank + dr;
-      while (targetFile >= 'a'.charCodeAt(0) && targetFile <= 'h'.charCodeAt(0) && targetRank >= 1 && targetRank <= 8) {
-        const target = String.fromCharCode(targetFile) + targetRank;
-        if (this.pieces.has(target)) {
-          if (this.isEnemyPiece(target)) moves.push(target);
-          break;
-        }
-        moves.push(target);
-        targetFile += df;
-        targetRank += dr;
-      }
-    });
-
-    return moves;
-  }
-
-  isEnemyPiece(pos) {
-    const piece = this.pieces.get(pos)[0];
-    if (!piece) return false;
-    return (this.turn === 'w' && piece >= 'a' && piece <= 'z') || (this.turn === 'b' && piece >= 'A' && piece <= 'Z');
-  }
-
-  getPossibleMoves() {
-    this.pieces.forEach((piece, pos) => {
-      let moves;
-      switch (piece) {
-        case 'P': moves = this.getPawnMoves(pos); break;
-        case 'N': moves = this.getKnightMoves(pos); break;
-        case 'B': moves = this.getBishopMoves(pos); break;
-        case 'R': moves = this.getRookMoves(pos); break;
-        case 'Q': moves = this.getQueenMoves(pos); break;
-        case 'K': moves = this.getKingMoves(pos); break;
-        case 'p': moves = this.getPawnMoves(pos); break;
-        case 'n': moves = this.getKnightMoves(pos); break;
-        case 'b': moves = this.getBishopMoves(pos); break;
-        case 'r': moves = this.getRookMoves(pos); break;
-        case 'q': moves = this.getQueenMoves(pos); break;
-        case 'k': moves = this.getKingMoves(pos); break;
-      }
-      console.log(`${piece} at ${pos}: ${moves}`);
-    });
-  }
-
-  setPieces() {
-    const bound = (this.turn === 'w') ? ['A','Z'] : ['a','z'];
-    let index = 0;
-    let file = 'a';
-    let rank = '8';
-
-    for (let i = 0; this.fen[i] !== ' ' && this.fen[i]; i++) {
-      if (this.fen[i] >= bound[0] && this.fen[i] <= bound[1])
-        this.pieces.set(file + rank, this.fen[i]);
-      if (this.fen[i] === '/')
-      {
-        file = 'a';
-        rank = prevChar(rank);
-      }
-      else
-      {
-        const num = parseInt(this.fen[i])
-        if (num)
-          file = nextChar(file, num);
-        else
-          file = nextChar(file);
-      }
+    if (kings[0] !== 1 || kings[1] !== 1) {
+      throw new Error("Each player must have exactly one king.");
     }
   }
+  
+  getBoard() {
+    return this.board;
+  }
+
+  // make a http request to the server to get the legal moves
+  // https://0.0.0.0:5000/api/Chess?fen=this.fen
+  // Response body: {
+  //   "fen": "4k2r/r3bppp/p1np4/1p1NpP2/2p1P3/6N1/PPKR2PP/4QB1R w k - 4 23",
+  //   "legalMoves": [
+  //     "f5 f6 P",
+  //     "a2 a4 P",
+  //     "a2 a3 P",
+  //     "b2 b4 P",
+  //     "b2 b3 P",
+  //     "h2 h4 P",
+  //     "h2 h3 P",
+  //     "d5 c7 N",
+  //     "d5 e7 N",
+  //     "d5 b6 N",
+  //     "d5 f6 N",
+  //     "d5 b4 N",
+  //     "d5 f4 N",
+  //     "d5 c3 N",
+  //     "d5 e3 N",
+  //     "g3 h5 N",
+  //     "g3 e2 N",
+  //     "f1 c4 B",
+  //     "f1 d3 B",
+  //     "f1 e2 B",
+  //     "d2 d4 R",
+  //     "d2 d3 R",
+  //     "d2 e2 R",
+  //     "d2 f2 R",
+  //     "d2 d1 R",
+  //     "h1 g1 R",
+  //     "e1 e3 Q",
+  //     "e1 e2 Q",
+  //     "e1 f2 Q",
+  //     "e1 a1 Q",
+  //     "e1 b1 Q",
+  //     "e1 c1 Q",
+  //     "e1 d1 Q",
+  //     "c2 c3 K",
+  //     "c2 b1 K",
+  //     "c2 c1 K",
+  //     "c2 d1 K"
+  //   ]
+  // }
+  //  OR
+  // Response body: {
+  //   "fen": "4k2r/r3bppp/p1np4/1p1NpP2/2p1P3/6N1/PPKR2PP/4QB1R w k - 4 23",
+  //   "legalMoves": ["Stalemate"] or ["Checkmate"]
+  // }
+
 
   initializeBoard() {
     let index = 0;
     let i = 0
 
-    // Board representation
-    for (; this.fen[i] !== ' ' && this.fen[i]; i++) {
-      const num = parseInt(this.fen[i])
+    this.isFenValid();
 
-      if (num)
-        index += num;
-      else if (this.fen[i] !== '/')
-        this.bitboards[PIECE.get(this.fen[i])] |= 1n << BigInt(index++);
+    // Board representation
+    for (let row = 8; row >= 1; row--) {
+      for (let col = 'a'; col <= 'h'; col++) {
+        if (this.fen[i] === '/') {
+          i++;
+        }
+        if (this.fen[i] >= '1' && this.fen[i] <= '8') {
+          index += parseInt(this.fen[i]);
+          i++;
+        }
+        this.board.set(col + row, this.fen[i]);
+        index++;
+        i++;
+      }
     }
     
     // Active Color
@@ -244,57 +163,142 @@ class Chess {
     for (++i; this.fen[i] !== ' ' && this.fen[i]; i++)
       fullmove += this.fen[i];
     this.fullmove = parseInt(fullmove);
+
+    // Create a map of legal moves for each piece of the active color
+    // Key: piece location, Value: list of legal moves
+    // this.setLegalMoves();
+
   }
 
-  // Method to print the board for debugging purposes
-  printBoard() {
-    const pieceSymbols = [
-      'P', 'N', 'B', 'R', 'Q', 'K', // White pieces
-      'p', 'n', 'b', 'r', 'q', 'k'  // Black pieces
-    ];
-  
-    const files = 'abcdefgh';
-    
-    // Print the board with rank and file axes
-    for (let rank = 0; rank < 8; rank++) {
-      let row = `${8 - rank} `;
-      for (let file = 0; file < 8; file++) {
-        const squareMask = 1n << BigInt(rank * 8 + file);
-        let piece = '.';
-  
-        for (let i = 0; i < this.bitboards.length; i++) {
-          if (this.bitboards[i] & squareMask) {
-            piece = pieceSymbols[i];
-            break;
+  updateFen() {
+    let fen = "";
+    let empty = 0;
+    for (let row = 8; row >= 1; row--) {
+      for (let col = 'a'; col <= 'h'; col++) {
+        let piece = this.board.get(col + row);
+        if (piece === ' ') {
+          empty++;
+        } else {
+          if (empty > 0) {
+            fen += empty;
+            empty = 0;
           }
+          fen += piece;
         }
-        row += piece + ' ';
       }
-      console.log(row);
+      if (empty > 0) {
+        fen += empty;
+        empty = 0;
+      }
+      if (row > 1) {
+        fen += "/";
+      }
     }
-    
-    // Print the files at the bottom
-    let fileRow = '  ';
-    for (let file = 0; file < 8; file++) {
-      fileRow += `${files[file]} `;
-    }
-    console.log(fileRow);
+    fen += " " + this.turn + " " + this.castle + " " + this.enPassant + " " + this.halfmove + " " + this.fullmove;
+    this.fen = fen;
+  }
 
-    console.log('\n');
-    console.log("turn:", this.turn);
-    console.log("Castle:", this.castle);
-    console.log("En Passant:", this.enPassant);
-    console.log("Halfmove:", this.halfmove);
-    console.log("Fullmove:", this.fullmove);
-    console.log("\n");
-    // this.pieces.forEach((value, key) => {
-    //   console.log("key:", key, "value:", value);
-    // });
-    this.getPossibleMoves();
+  getFen() {
+    return this.fen;
+  }
+
+  getPiece(square) {
+    return this.board.get(square);
+  }
+
+  setPiece(square, piece) {
+    this.board.set(square, piece);
+  }
+
+  movePiece(from, to) {
+    if (!this.legalMoves.has(from) || !this.legalMoves.get(from).includes(to)) {
+      throw new Error("Invalid move.");
+    }
+
+    if (this.getPiece(from) === ' ') {
+      throw new Error("No piece at the given square.");
+    }
+
+    this.enPassant = "-";
+    this.halfmove++;
+
+    if (this.getPiece(from).toLowerCase() === 'p' && Math.abs(parseInt(from[1]) - parseInt(to[1])) === 2) {
+      this.enPassant = from[0] + (parseInt(from[1]) + 1);
+    }
+    else if (this.getPiece(from).toLowerCase() === 'k') {
+      if (Math.abs(from.charCodeAt(0) - to.charCodeAt(0)) === 2) {
+        if (to.charCodeAt(0) > from.charCodeAt(0)) {
+          this.setPiece('h' + from[1], ' ');
+          this.setPiece('f' + from[1], this.turn === 'w' ? 'R' : 'r');
+        } else {
+          this.setPiece('a' + from[1], ' ');
+          this.setPiece('d' + from[1], this.turn === 'w' ? 'R' : 'r');
+        }
+      }
+      if (this.turn === 'w') {
+        this.castle = this.castle.replace(/[KQ]/g, '');
+      }
+      else {
+        this.castle = this.castle.replace(/[kq]/g, '');
+      }
+      if (this.castle === "") {
+        this.castle = "-";
+      }
+    }
+    else if (this.getPiece(from).toLowerCase() === 'r') {
+      if (from === 'a1') {
+        this.castle = this.castle.replace(/[Q]/g, '');
+      }
+      else if (from === 'h1') {
+        this.castle = this.castle.replace(/[K]/g, '');
+      }
+      else if (from === 'a8') {
+        this.castle = this.castle.replace(/[q]/g, '');
+      }
+      else if (from === 'h8') {
+        this.castle = this.castle.replace(/[k]/g, '');
+      }
+      if (this.castle === "") {
+        this.castle = "-";
+      }
+    }
+
+    if (this.getPiece(from).toLowerCase() === 'p') {
+      if (to === this.enPassant) {
+        this.setPiece(to[0] + (this.turn === 'w' ? '5' : '4'), ' ');
+      } else if (to[1] === '1' || to[1] === '8') {
+        this.setPiece(to, this.turn === 'w' ? 'Q' : 'q');
+      }
+    } else {
+      this.setPiece(to, this.getPiece(from));
+    }
+    this.setPiece(from, ' ');
+
+    if (this.getPiece(to) !== ' ' || this.getPiece(from).toLowerCase() === 'p') {
+      this.halfmove = 0;
+    }
+    if (this.turn === 'b') {
+      this.fullmove++;
+    }
+    this.turn = this.turn === 'w' ? 'b' : 'w';
+    this.updateFen();
+  }
+
+  getPieceColor(piece) {
+    return piece === piece.toUpperCase() ? 'w' : 'b';
+  }
+
+  getLegalMoves(square) {
+    return this.legalMoves.get(square);
+  }
+
+  getLegalMovesMap() {
+    return this.legalMoves;
   }
 }
 
 // const chess = new Chess("r1bk3r/p2pBpNp/n4n2/1p1NP2P/6P1/3P4/P1P1K3/q5b1");
-const chess = new Chess("rnbqkbnr/ppp1pppp/4P3/3p4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3");
+// const chess = new Chess("rnbqkbnr/ppp1pppp/4P3/3p4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3");
                         //  rnbqkbnr/ppppp1pp/8/5p2/3P4/8/PPP1PPPP/RNBQKBNR w KQkq f6 0 1
-chess.printBoard();
+
+export default Chess;

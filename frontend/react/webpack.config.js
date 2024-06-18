@@ -49,6 +49,12 @@ module.exports = {
         exclude: /node_modules/,
         use: ["style-loader", "css-loader"],
       },
+      {
+        test: /\.(png|jpe?g|gif)$/i,
+        include: path.resolve(__dirname, "src/assets/pieces"),
+        exclude: /node_modules/,
+        type: "asset/resource",
+      },
     ],
   },
   resolve: {

@@ -153,6 +153,19 @@ public partial class Chess
         }
         else if (move.Piece == 'K' || move.Piece == 'k')
         {
+            if (Math.Abs(BitOperations.TrailingZeroCount(move.To) - BitOperations.TrailingZeroCount(move.From)) == 2)
+            {
+                if (move.To > move.From)
+                {
+                    _bitboards[Pieces[color, 3]] &= ~RookPositions[color, 0];
+                    _bitboards[Pieces[color, 3]] |= RookCastlePositions[color, 0];
+                }
+                else
+                {
+                    _bitboards[Pieces[color, 3]] &= ~RookPositions[color, 1];
+                    _bitboards[Pieces[color, 3]] |= RookCastlePositions[color, 1];
+                }
+            }
             SetKingPos();
             _castle[color, 0] = false;
             _castle[color, 1] = false;
@@ -182,6 +195,22 @@ public partial class Chess
         else if (move.PrevPiece != '-')
         {
             _bitboards[move.PrevPiece] |= move.To;
+        }
+        else if (move.Piece == 'K' || move.Piece == 'k')
+        {
+            if (Math.Abs(BitOperations.TrailingZeroCount(move.To) - BitOperations.TrailingZeroCount(move.From)) == 2)
+            {
+                if (move.To > move.From)
+                {
+                    _bitboards[Pieces[color, 3]] &= ~RookCastlePositions[color, 0];
+                    _bitboards[Pieces[color, 3]] |= RookPositions[color, 0];
+                }
+                else
+                {
+                    _bitboards[Pieces[color, 3]] &= ~RookCastlePositions[color, 1];
+                    _bitboards[Pieces[color, 3]] |= RookPositions[color, 1];
+                }
+            }
         }
         if (move.IsPromotion)
         {

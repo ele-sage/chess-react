@@ -28,11 +28,12 @@ public partial class Chess
         int[,] kingPos = { { _kingPos[0, 0], _kingPos[0, 1] }, { _kingPos[1, 0], _kingPos[1, 1] } };
         ulong pinnedToKing = _pinnedToKing[color];
 
+        PrintAllFieldsToFile("original");
         foreach (Move move in allMoves)
         {
             ApplyMove(move);
             int score = AlphaBeta(maxDepth - 1, alpha, beta, !isMaximizingPlayer);
-            UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing);
+            UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing, true);
             if (isMaximizingPlayer && score > bestScore)
             {
                 bestScore = score;
@@ -49,6 +50,7 @@ public partial class Chess
             if (alpha >= beta)
                 break;
         }
+        PrintAllFieldsToFile("final");
         Console.WriteLine($"Possible moves: {_possibleMove}");
         return bestMove;
     }   
