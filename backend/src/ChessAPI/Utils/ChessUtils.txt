@@ -31,3 +31,7 @@ rn2kbnr/pp3ppp/3p4/2p1pP2/2K1P1b1/8/PPq1Q1PP/RNB2BNR w kq - 0 8
 rn2kbnr/pp3ppp/3p4/2p1pP2/2K1P1b1/2N5/PPq1Q1PP/R1B2BNR b kq - 1 8
 rn2kbnr/1p3ppp/p2p4/2p1pP2/2K1P3/2NQ4/PPq1b1PP/R1B2BNR w kq - 2 10
 rn2kbnr/1p3ppp/p2p4/2pKpP2/4P3/2Nq4/PP2b1PP/R1B2BNR w kq - 0 11 check mate
+
+Ordering (Search if in list of moves there is a previous best move, if so place it first).
+Move format change from class to u16,u32 or u64?
+
