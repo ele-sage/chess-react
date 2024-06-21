@@ -31,6 +31,8 @@ public partial class Chess
     private Move            _currentBestMove = new('-', 0UL, 0UL);
     private int             _currentBestScore = 0;
     private readonly Dictionary<char, Func<ulong, int, bool, int, ulong[]>> _moveGenerators;
+    // Evaluate function that will be used to evaluate the board state
+    private readonly Func<int> _evaluate;
     private Move            _bestMove = new('-', 0UL, 0UL);
     private int             _bestScore = 0;
     public Chess(string fen = Fen)
@@ -55,6 +57,7 @@ public partial class Chess
         _emptyBitboard = ~(_fullBitboard[0] | _fullBitboard[1]);
         SetKingPos();
         InitCoverage();
+        _evaluate = _turn == 'w' ? Evaluate : PeSTO_Eval;
     }
 
     private void InitializeBoard()

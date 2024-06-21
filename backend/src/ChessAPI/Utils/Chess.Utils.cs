@@ -141,6 +141,7 @@ public partial class Chess
         if (castle.Length == 0) castle = "-";
         string enPassant = _enPassantMask == 0 ? "-" : BitboardToSquare(_enPassantMask);
         _fen = fen + " " + _turn + " " + castle + " " + enPassant + " " + _halfmove.ToString() + " " + _fullmove.ToString();
+        Console.WriteLine(_fen);
         return _fen;
     }
 
@@ -231,6 +232,14 @@ public partial class Chess
             // Console.WriteLine(moveSerialized);
             legalMoves.Add(moveSerialized);
         }
+        if (moves.Length == 0 || moves[0].Piece == '-' || moves[0].Piece == '+')
+        {
+            if (IsCheck(_turn))
+                legalMoves.Add("Checkmate");
+            else
+                legalMoves.Add("Stalemate");
+        }
+        Console.WriteLine($"Legal Moves: {legalMoves.Count}");
         return legalMoves;
     }
 
@@ -261,10 +270,10 @@ public partial class Chess
             legalMoves.Add("Checkmate");
         ApplyMove(bestMove);
         Move[] moves = GetAllPossibleMoves(_turn);
+        Console.WriteLine($"Legal Moves: {moves.Length}");
         foreach (Move move in moves)
         {
             string moveSerialized = $"{BitboardToSquare(move.From)} {BitboardToSquare(move.To)} {move.Piece}";
-            Console.WriteLine(moveSerialized);
             legalMoves.Add(moveSerialized);
         }
         return legalMoves;

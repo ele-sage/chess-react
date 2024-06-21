@@ -19,6 +19,7 @@ namespace ChessAPI.Controllers
             }
             catch (Exception e)
             {
+                Console.WriteLine(fen);
                 return BadRequest(e.Message);
             }
         }

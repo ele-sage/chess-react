@@ -24,8 +24,8 @@ public partial class Chess
                     int pieceIndex = BitOperations.TrailingZeroCount(piecePos);
                     if ((_pieceCoverage[color ^ 1] & (1UL << pieceIndex)) != 0)
                     {
-                        mg[color] += ChessConstants.mg_table[i + color * 6, pieceIndex] / 3;
-                        eg[color] += ChessConstants.eg_table[i + color * 6, pieceIndex] / 3;
+                        mg[color] += ChessConstants.mg_table[i + color * 6, pieceIndex] * 2 / 3;
+                        eg[color] += ChessConstants.eg_table[i + color * 6, pieceIndex] * 2 / 3;
                     }
                     else
                     {
@@ -92,10 +92,7 @@ public partial class Chess
     private int AlphaBeta(int depth, int alpha, int beta, bool isMaximizingPlayer, Stopwatch stopwatch)
     {
         if (depth == 0 || stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
-        {
-            // return PeSTO_Eval();
-            return Evaluate();
-        }
+            return _evaluate();
         ulong hash = ComputeHash();
         if (_transpositionTable.TryGetValue(hash, out var entry) && entry.depth >= depth)
         {
@@ -111,6 +108,7 @@ public partial class Chess
         }
 
         int color = _turn == 'w' ? 0 : 1;
+        // int numMoves = GetAllPossibleMoves(_turn);
         Move[] moves = GetAllPossibleMoves(_turn);
         if (moves.Length == 0)
         {
@@ -123,17 +121,37 @@ public partial class Chess
         int bestScore = isMaximizingPlayer ? int.MinValue : int.MaxValue;
         ulong enPassantMask = _enPassantMask;
         ulong[] fullBitboard = [_fullBitboard[0], _fullBitboard[1]];
+
+        // ulong[] pieceCoverage = [_pieceCoverage[0], _pieceCoverage[1]];
+        // ulong[] pieceAttacks = [_pieceAttack[0], _pieceAttack[1]];
+        // ulong[] bitboards = [_bitboards['P'], _bitboards['N'], _bitboards['B'], _bitboards['R'], _bitboards['Q'], _bitboards['K'],
+        //                      _bitboards['p'], _bitboards['n'], _bitboards['b'], _bitboards['r'], _bitboards['q'], _bitboards['k']];
+        
         bool[,] castle = {{ _castle[0, 0], _castle[0, 1] }, { _castle[1, 0], _castle[1, 1] }};
         int[,] kingPos = {{ _kingPos[0, 0], _kingPos[0, 1] }, { _kingPos[1, 0], _kingPos[1, 1] }};
         ulong pinnedToKing = _pinnedToKing[color];
-        
+
+        // copy all the moves in _moves into a new array
+        // Move[] moves = new Move[numMoves];
+
+        // int i = 0;
+        // for (int j = 0; j < 12; j++)
+        // {
+        //     if (_moves[j] != null)
+        //     {
+        //         foreach (Move move in _moves[j])
+        //         {
+        //             moves[i++] = new Move(move);
+        //         }
+        //     }
+        // }
 
         foreach (Move move in moves)
         {
             ApplyMove(move);
             int score = AlphaBeta(depth - 1, alpha, beta, !isMaximizingPlayer, stopwatch);
+            // UndoMove(enPassantMask, pieceCoverage, pieceAttacks, bitboards, castle, kingPos, pinnedToKing);
             UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing);
-
             if (isMaximizingPlayer)
             {
                 if (score > bestScore)
@@ -164,7 +182,6 @@ public partial class Chess
             if (alpha >= beta)
                 break;
         }
-
         _transpositionTable.Store(hash, depth, bestScore, bestScore <= alpha ? TranspositionTable.UPPERBOUND : (bestScore >= beta ? TranspositionTable.LOWERBOUND : TranspositionTable.EXACT));
         return bestScore;
 
@@ -244,7 +261,41 @@ public partial class Chess
         }
         _turn = _turn == 'w' ? 'b' : 'w';
     }
+    // private void UndoMove(ulong enPassantMask, ulong[] pieceCoverage, ulong[] pieceAttacks, ulong[] bitboard, bool[,] castle, int[,] kingPos, ulong pinnedToKing)
+    // {
+    //     _turn = _turn == 'w' ? 'b' : 'w';
+    //     int color = _turn == 'w' ? 0 : 1;
 
+    //     _enPassantMask = enPassantMask;
+    //     _pieceCoverage[0] = pieceCoverage[0];
+    //     _pieceCoverage[1] = pieceCoverage[1];
+    //     _pieceAttack[0] = pieceAttacks[0];
+    //     _pieceAttack[1] = pieceAttacks[1];
+    //     _bitboards['P'] = bitboard[0];
+    //     _bitboards['N'] = bitboard[1];
+    //     _bitboards['B'] = bitboard[2];
+    //     _bitboards['R'] = bitboard[3];
+    //     _bitboards['Q'] = bitboard[4];
+    //     _bitboards['K'] = bitboard[5];
+    //     _bitboards['p'] = bitboard[6];
+    //     _bitboards['n'] = bitboard[7];
+    //     _bitboards['b'] = bitboard[8];
+    //     _bitboards['r'] = bitboard[9];
+    //     _bitboards['q'] = bitboard[10];
+    //     _bitboards['k'] = bitboard[11];
+    //     _castle[0, 0] = castle[0, 0];
+    //     _castle[0, 1] = castle[0, 1];
+    //     _castle[1, 0] = castle[1, 0];
+    //     _castle[1, 1] = castle[1, 1];
+    //     _kingPos[0, 0] = kingPos[0, 0];
+    //     _kingPos[0, 1] = kingPos[0, 1];
+    //     _kingPos[1, 0] = kingPos[1, 0];
+    //     _kingPos[1, 1] = kingPos[1, 1];
+    //     _pinnedToKing[color] = pinnedToKing;
+    //     _fullBitboard[0] = _bitboards['P'] | _bitboards['N'] | _bitboards['B'] | _bitboards['R'] | _bitboards['Q'] | _bitboards['K'];
+    //     _fullBitboard[1] = _bitboards['p'] | _bitboards['n'] | _bitboards['b'] | _bitboards['r'] | _bitboards['q'] | _bitboards['k'];
+    //     _emptyBitboard = ~(_fullBitboard[0] | _fullBitboard[1]);
+    // }
     private void UndoMove(Move move, ulong enPassantMask, ulong[] fullBitboard, bool[,] castle, int[,] kingPos, ulong pinnedToKing, bool setMoves = false)
     {
         _turn = _turn == 'w' ? 'b' : 'w';
@@ -286,8 +337,8 @@ public partial class Chess
         _castle[1, 0] = castle[1,0];
         _castle[1, 1] = castle[1,1];
         _enPassantMask = enPassantMask;
-        _fullBitboard[color] = fullBitboard[color];
-        _fullBitboard[color ^ 1] = fullBitboard[color ^ 1];
+        _fullBitboard[0] = fullBitboard[0];
+        _fullBitboard[1] = fullBitboard[1];
         _emptyBitboard = ~(_fullBitboard[0] | _fullBitboard[1]);
         _kingPos[0, 0] = kingPos[0,0];
         _kingPos[0, 1] = kingPos[0,1];

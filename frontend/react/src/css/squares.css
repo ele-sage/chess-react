@@ -1,14 +1,28 @@
 .square {
-  background-color: #ffd599;
   float: left;
   width: 60px;
   height: 60px;
 }
 
 .square.light {
-  background-color: #ffd599;
+  background-color: #f0d9b5;
 }
 
 .square.dark {
-  background-color: #B06E40;
+  background-color: #b58863;
+}
+
+.square.hover {
+  background-color: yellowgreen;
+}
+
+.square div {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 32px;
+  font-weight: bold;
+  pointer-events: none; /* To ensure the div does not intercept the drag events */
 }

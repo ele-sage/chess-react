@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Numerics;
 
 namespace ChessAPI
 {
@@ -8,8 +9,9 @@ public partial class Chess
     private Move IterativeDeepening()
     {
         _maxDepth = 6;
-        _timeLimitMillis = 1000;
+        _timeLimitMillis = 5000;
 
+        // PrintAllFieldsToFile("original");
         Stopwatch stopwatch = new();
         stopwatch.Start();
         bool isMaximizingPlayer = _turn == 'w';
@@ -35,29 +37,32 @@ public partial class Chess
                 _bestMove = _currentBestMove;
         }
         stopwatch.Stop();
+        // SetCoverage(0);
+        // SetCoverage(1);
+        // IsCheck(0);
+        // IsCheck(1);
+        // PrintAllFieldsToFile("final");
+
         Console.WriteLine($"Depth: {_currentDepth}");
         Console.WriteLine($"Possible moves: {_possibleMove}");
         return _bestMove;
     }
 
-    private static List<Move> GetMoves(ulong from, ulong moves, char piece)
+    private Move[] GetMoves(ulong from, ulong moves, char piece)
     {
-        List<Move> moveList = [];
-
+        Move[] movesArray = new Move[BitOperations.PopCount(moves)];
+        int i = 0;
         while (moves != 0)
         {
             ulong bit = moves & ~(moves - 1);
-            moveList.Add(new Move(piece, from, bit));
+            movesArray[i++] = new Move(piece, from, bit);
             moves &= moves - 1;
         }
-        return moveList;
+        return movesArray;
     }
-
     private Move[] GetAllPossibleMoves(char turn)
     {
         int color = turn == 'w' ? 0 : 1;
-        List<Move> moves = [];
-        List<Move> attacks = [];
 
         SetFullBitboard(color);
         SetFullBitboard(color ^ 1);
@@ -68,12 +73,13 @@ public partial class Chess
         _pinnedToKing[color] = PinnedToKing(color, RookDirections) | PinnedToKing(color, BishopDirections);
         SetCoverage(color ^ 1);
         IsCheck(color);
+        List<Move> moves = [];
+        List<Move> attacks = [];
 
-        for (int i = 0; i < 6; i++)
+        foreach (char piece in PiecesString[color])
         {
-            char pieceKey = char.ToLower(Pieces[color, i]);
-            ulong piecesMask = _bitboards[Pieces[color, i]];
-
+            char pieceKey = char.ToLower(piece);
+            ulong piecesMask = _bitboards[piece];
             while (piecesMask != 0)
             {
                 ulong pieceBitboard = piecesMask & ~(piecesMask - 1);
@@ -93,21 +99,12 @@ public partial class Chess
                         movesAttacks[0] &= _checkBy[color].ElementAt(0).Value;
                         movesAttacks[1] &= _checkBy[color].ElementAt(0).Value;
                     }
-                    moves.AddRange(GetMoves(pieceBitboard, movesAttacks[0], Pieces[color, i]));
-                    attacks.AddRange(GetMoves(pieceBitboard, movesAttacks[1], Pieces[color, i]));
-
-                    // moves.InsertRange(0, GetMoves(pieceBitboard, movesAttacks[0] & ~_pieceCoverage[color ^ 1], Pieces[color, i]));
-                    // moves.AddRange(GetMoves(pieceBitboard, movesAttacks[0] & _pieceCoverage[color ^ 1], Pieces[color, i]));
-                    // attacks.InsertRange(0, GetMoves(pieceBitboard, movesAttacks[1] & ~_pieceCoverage[color ^ 1], Pieces[color, i]));
-                    // attacks.AddRange(GetMoves(pieceBitboard, movesAttacks[1] & _pieceCoverage[color ^ 1], Pieces[color, i]));
-
-                    // moves.InsertRange(0, GetMoves(pieceBitboard, movesAttacks[1] & _pieceCoverage[color ^ 1], Pieces[color, i]));
-                    // moves.AddRange(GetMoves(pieceBitboard, movesAttacks[0] & _pieceCoverage[color ^ 1], Pieces[color, i]));
-                    // attacks.InsertRange(0, GetMoves(pieceBitboard, movesAttacks[1] & ~_pieceCoverage[color ^ 1], Pieces[color, i]));
-                    // attacks.AddRange(GetMoves(pieceBitboard, movesAttacks[0] & ~_pieceCoverage[color ^ 1], Pieces[color, i]));
+                    moves.AddRange(GetMoves(pieceBitboard, movesAttacks[0], piece));
+                    attacks.AddRange(GetMoves(pieceBitboard, movesAttacks[1], piece));
                 }
             }
         }
+
         return [.. attacks, .. moves];
     }
 }
@@ -128,6 +125,16 @@ public class Move
         PrevPiece = '-';
         IsPromotion = false;
         CastleMask = 0UL;
+    }
+
+    public Move(Move move)
+    {
+        Piece = move.Piece;
+        From = move.From;
+        To = move.To;
+        PrevPiece = move.PrevPiece;
+        IsPromotion = move.IsPromotion;
+        CastleMask = move.CastleMask;
     }
 
     public static string GetBitBoardString(ulong bitboard)

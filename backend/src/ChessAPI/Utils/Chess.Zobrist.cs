@@ -45,6 +45,7 @@ public partial class Chess
         }
         BlackToMoveHash = (ulong)rand.Next();
     }
+
     private ulong ComputeHash()
     {
         ulong hash = 0UL;

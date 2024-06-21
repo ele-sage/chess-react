@@ -5,9 +5,6 @@ namespace ChessAPI
 // Chess.Moves.cs
 public partial class Chess
 {
-    private Dictionary<string, List<string>>[] _moves = [[], []];
-    private Dictionary<ulong, ulong>[] _movesBitboard = [[], []];
-
     private ulong[] GeneratePawnMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         ulong moves = 0UL;

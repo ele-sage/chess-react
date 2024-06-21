@@ -32,7 +32,14 @@ class Chess {
     this.enPassant = "-";
     this.halfmove = 0;
     this.fullmove = 1;
+    this.legalMoves = new Map();
+    this.isCheckmate = false;
+    this.isStalemate = false;
+    this.isCheck = false;
+    this.playingAgainstComputer = false;
     if (fen !== FEN) this.initializeBoard();
+    this.setLegalMoves();
+    console.log("Constructor called.");
   }
 
   isFenValid() {
@@ -67,6 +74,52 @@ class Chess {
   getBoard() {
     return this.board;
   }
+
+  checkIfCheck() {
+    this.isCheck = false;
+    for (let [square, piece] of this.board) {
+      if (piece.toLowerCase() === 'k') {
+        const color = this.getPieceColor(piece);
+        for (let [from, to] of this.legalMoves) {
+          if (to.includes(square)) {
+            this.isCheck = true;
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  setLegalMoves() {
+    console.log("Setting legal moves.");
+    const legalMoves = new Map();
+    fetch("http://0.0.0.0:5000/api/Chess/?fen=" + this.fen)
+      .then(response => response.json())
+      .then(data => {
+        if (data.legalMoves[0] === "Stalemate"){
+          this.isStalemate = true;
+          console.log("Stalemate");
+        } else if (data.legalMoves[0] === "Checkmate") {
+          this.isCheckmate = true;
+          console.log("Checkmate");
+        } else {
+          data.legalMoves.forEach(move => {
+            let [from, to, piece] = move.split(' ');
+            if (!legalMoves.has(from)) {
+              legalMoves.set(from, []);
+            }
+            legalMoves.get(from).push(to);
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    this.legalMoves = legalMoves;
+    console.log(this.legalMoves);
+    this.checkIfCheck();
+  }
+
 
   // make a http request to the server to get the legal moves
   // https://0.0.0.0:5000/api/Chess?fen=this.fen
@@ -167,35 +220,35 @@ class Chess {
     // Create a map of legal moves for each piece of the active color
     // Key: piece location, Value: list of legal moves
     // this.setLegalMoves();
-
+    // this.updateFen();
+    this.printBoard();
   }
 
   updateFen() {
-    let fen = "";
-    let empty = 0;
-    for (let row = 8; row >= 1; row--) {
-      for (let col = 'a'; col <= 'h'; col++) {
-        let piece = this.board.get(col + row);
+    const rows = [];
+    for (let rank = 8; rank >= 1; rank--) {
+      let emptyCount = 0;
+      let row = '';
+      for (let file = 0; file < 8; file++) {
+        const square = String.fromCharCode(97 + file) + rank;
+        const piece = this.board.get(square) || ' ';
         if (piece === ' ') {
-          empty++;
+          emptyCount++;
         } else {
-          if (empty > 0) {
-            fen += empty;
-            empty = 0;
+          if (emptyCount > 0) {
+            row += emptyCount;
+            emptyCount = 0;
           }
-          fen += piece;
+          row += piece;
         }
       }
-      if (empty > 0) {
-        fen += empty;
-        empty = 0;
+      if (emptyCount > 0) {
+        row += emptyCount;
       }
-      if (row > 1) {
-        fen += "/";
-      }
+      rows.push(row);
     }
-    fen += " " + this.turn + " " + this.castle + " " + this.enPassant + " " + this.halfmove + " " + this.fullmove;
-    this.fen = fen;
+    const fenPosition = rows.join('/');
+    this.fen = `${fenPosition} ${this.turn} ${this.castle} ${this.enPassant} ${this.halfmove} ${this.fullmove}`;
   }
 
   getFen() {
@@ -210,7 +263,30 @@ class Chess {
     this.board.set(square, piece);
   }
 
+  printAllOccupiedSquares() {
+    for (let [key, value] of this.board) {
+      if (value !== ' ') {
+        console.log(key, value);
+      }
+    }
+  }
+
+  printBoard() {
+    let row = "";
+    for (let [key, value] of this.board) {
+      row += value + " ";
+      if (key[0] === 'h') {
+        console.log(row);
+        row = "";
+      }
+    }
+  }
+
   movePiece(from, to) {
+    console.log("Piece:", this.getPiece(from), "From:", from, "To:", to);
+    if (from === to) {
+      return false;
+    }
     if (!this.legalMoves.has(from) || !this.legalMoves.get(from).includes(to)) {
       throw new Error("Invalid move.");
     }
@@ -223,7 +299,7 @@ class Chess {
     this.halfmove++;
 
     if (this.getPiece(from).toLowerCase() === 'p' && Math.abs(parseInt(from[1]) - parseInt(to[1])) === 2) {
-      this.enPassant = from[0] + (parseInt(from[1]) + 1);
+      this.enPassant = from[0] + (this.turn === 'w' ? '3' : '6');
     }
     else if (this.getPiece(from).toLowerCase() === 'k') {
       if (Math.abs(from.charCodeAt(0) - to.charCodeAt(0)) === 2) {
@@ -268,6 +344,8 @@ class Chess {
         this.setPiece(to[0] + (this.turn === 'w' ? '5' : '4'), ' ');
       } else if (to[1] === '1' || to[1] === '8') {
         this.setPiece(to, this.turn === 'w' ? 'Q' : 'q');
+      } else {
+        this.setPiece(to, this.getPiece(from));
       }
     } else {
       this.setPiece(to, this.getPiece(from));
@@ -282,6 +360,7 @@ class Chess {
     }
     this.turn = this.turn === 'w' ? 'b' : 'w';
     this.updateFen();
+    return true;
   }
 
   getPieceColor(piece) {
@@ -292,8 +371,24 @@ class Chess {
     return this.legalMoves.get(square);
   }
 
-  getLegalMovesMap() {
+  getAllLegalMoves() {
     return this.legalMoves;
+  }
+
+  getIsStalemate() {
+    return this.isStalemate;
+  }
+
+  getIsCheckmate() {
+    return this.isCheckmate;
+  }
+
+  getIsCheck() {
+    return this.isCheck;
+  }
+
+  setPlayingAgainstComputer(playingAgainstComputer) {
+    this.playingAgainstComputer = playingAgainstComputer;
   }
 }
 
