@@ -6,8 +6,7 @@ namespace ChessAPI.Controllers
     [ApiController]
     public class ChessController : ControllerBase
     {
-        // Based on the query string, chess engine will simply return the fen and legal moves
-        [HttpGet]
+        [HttpGet("legalmoves")]
         public ActionResult GetLegalMoves([FromQuery] string fen = "")
         {
             try
@@ -19,13 +18,11 @@ namespace ChessAPI.Controllers
             }
             catch (Exception e)
             {
-                Console.WriteLine(fen);
                 return BadRequest(e.Message);
             }
         }
 
-        // Based on the query string, chess engine will make a move and return the new fen and legal moves
-        [HttpGet("bot/")]
+        [HttpGet("bot")]
         public ActionResult GetBot([FromQuery] string fen = "")
         {
             try
@@ -42,4 +39,3 @@ namespace ChessAPI.Controllers
         }
     }
 }
-// 4k2r/r3bppp/p1np4/1p1NpP2/2p1P3/6N1/PPKR2PP/4QB1R w k - 4 23

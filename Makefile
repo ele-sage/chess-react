@@ -5,6 +5,7 @@ stop:
 	docker compose down
 	yes | docker network prune
 	yes | docker image prune
+	yes | docker volume prune
 
 delete_volumes:
 	make stop
@@ -20,3 +21,4 @@ backend:
 	docker exec -it chess-backend-1 bash
 
 .PHONY: start stop prune frontend backend
+# dotnet add package Swashbuckle.AspNetCore

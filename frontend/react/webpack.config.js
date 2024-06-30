@@ -9,7 +9,10 @@ module.exports = {
   devServer: {
     static: path.resolve(__dirname, "public"),
     open: true,
+    // host: '0.0.0.0',
     port: 3000,
+    // hot: true, // Enable hot module replacement
+    // watchFiles: ['src/**/*'], // Watch the src directory for changes
   },
   module: {
     rules: [

@@ -93,7 +93,7 @@ class Chess {
   setLegalMoves() {
     console.log("Setting legal moves.");
     const legalMoves = new Map();
-    fetch("http://0.0.0.0:5000/api/Chess/?fen=" + this.fen)
+    fetch("http://localhost:5000/api/Chess/legalmoves?fen=" + this.fen)
       .then(response => response.json())
       .then(data => {
         if (data.legalMoves[0] === "Stalemate"){
@@ -119,57 +119,6 @@ class Chess {
     console.log(this.legalMoves);
     this.checkIfCheck();
   }
-
-
-  // make a http request to the server to get the legal moves
-  // https://0.0.0.0:5000/api/Chess?fen=this.fen
-  // Response body: {
-  //   "fen": "4k2r/r3bppp/p1np4/1p1NpP2/2p1P3/6N1/PPKR2PP/4QB1R w k - 4 23",
-  //   "legalMoves": [
-  //     "f5 f6 P",
-  //     "a2 a4 P",
-  //     "a2 a3 P",
-  //     "b2 b4 P",
-  //     "b2 b3 P",
-  //     "h2 h4 P",
-  //     "h2 h3 P",
-  //     "d5 c7 N",
-  //     "d5 e7 N",
-  //     "d5 b6 N",
-  //     "d5 f6 N",
-  //     "d5 b4 N",
-  //     "d5 f4 N",
-  //     "d5 c3 N",
-  //     "d5 e3 N",
-  //     "g3 h5 N",
-  //     "g3 e2 N",
-  //     "f1 c4 B",
-  //     "f1 d3 B",
-  //     "f1 e2 B",
-  //     "d2 d4 R",
-  //     "d2 d3 R",
-  //     "d2 e2 R",
-  //     "d2 f2 R",
-  //     "d2 d1 R",
-  //     "h1 g1 R",
-  //     "e1 e3 Q",
-  //     "e1 e2 Q",
-  //     "e1 f2 Q",
-  //     "e1 a1 Q",
-  //     "e1 b1 Q",
-  //     "e1 c1 Q",
-  //     "e1 d1 Q",
-  //     "c2 c3 K",
-  //     "c2 b1 K",
-  //     "c2 c1 K",
-  //     "c2 d1 K"
-  //   ]
-  // }
-  //  OR
-  // Response body: {
-  //   "fen": "4k2r/r3bppp/p1np4/1p1NpP2/2p1P3/6N1/PPKR2PP/4QB1R w k - 4 23",
-  //   "legalMoves": ["Stalemate"] or ["Checkmate"]
-  // }
 
 
   initializeBoard() {

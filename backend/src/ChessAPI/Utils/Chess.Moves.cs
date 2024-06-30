@@ -184,7 +184,6 @@ public partial class Chess
         ulong knightMoves = KnightMoves(_bitboards[pieces[0]]) & _bitboards[pieces[1]];
 
         SetCheckBy(color, knightMoves, Self);
-
         for (int i = 0; i < 8; i++)
         {
             ulong direction = QueenDirections[i](_bitboards[pieces[0]]);

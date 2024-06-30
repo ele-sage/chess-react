@@ -8,6 +8,3 @@ const App = () => {
 }
 
 export default App;
-
-// rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR
-// rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR
