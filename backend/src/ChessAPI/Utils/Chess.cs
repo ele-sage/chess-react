@@ -26,7 +26,7 @@ public partial class Chess
     private int             _halfmove;
     private int             _fullmove;
     private int             _timeLimitMillis = 1000;
-    private int             _maxDepth = 5;
+    private int             _maxDepth = 6;
     private int             _currentDepth = 3;
     private Move            _currentBestMove = new('-', 0UL, 0UL);
     private int             _currentBestScore = 0;
@@ -57,7 +57,8 @@ public partial class Chess
         _emptyBitboard = ~(_fullBitboard[0] | _fullBitboard[1]);
         SetKingPos();
         InitCoverage();
-        _evaluate = _turn == 'w' ? Evaluate : PeSTO_Eval;
+        // _evaluate = _turn == 'w' ? Evaluate : PeSTO_Eval;
+        _evaluate = Evaluate;
     }
 
     private void InitializeBoard()

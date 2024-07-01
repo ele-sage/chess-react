@@ -1,6 +1,7 @@
 start:
 	docker compose up --build
 
+
 stop:
 	docker compose down
 	yes | docker network prune

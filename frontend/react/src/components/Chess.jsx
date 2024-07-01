@@ -1,54 +1,111 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import Board from './Board';
-import ChessGame from '../utils/chess';
 import "../css/styles.css";
+import "../css/toggle.css";
+import React, { useState, useMemo, useEffect } from 'react';
+import ChessGame from '../utils/chess';
+import Board from './Board';
+import FenInput from './FenInput';
+import { useLocalStorageState } from './utils';
+
+
+
+const PlayAgainstComputer = ({ toggleMode }) => {
+  return (
+    <label className="switch-bot">
+
+      <input type="checkbox" className="input-bot" onChange={toggleMode} />
+      <span className="slider-bot"></span>
+    </label>
+  );
+};
 
 const Chess = () => {
-  const chessGame = useMemo(() => new ChessGame(), []);
-  const [board, setBoard] = useState(chessGame.getBoard());
+  const [fen, setFen] = useLocalStorageState('FEN', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+  const chessInstance = useMemo(() => new ChessGame(fen, false), []);
+  const [board, setBoard] = useState(chessInstance.getBoard());
+  const [selectedSquare, setSelectedSquare] = useState(null);
   const [alertMessage, setAlertMessage] = useState('');
 
-  const movePiece = useCallback((from, to) => {
+  useEffect(() => {
+    setBoard(chessInstance.getBoard());
+  }, []);
+
+  const movePiece = async (from, to) => {
     try {
-      if (chessGame.movePiece(from, to)) {
-        setBoard(new Map(chessGame.getBoard()));
-        chessGame.setLegalMoves();
+      if (chessInstance.movePiece(from, to)) {
+        await chessInstance.setLegalMoves();
+        setBoard(new Map(chessInstance.getBoard()));
+        setFen(chessInstance.getFen());
+        if (chessInstance.isAgainstComputer()) {
+          await chessInstance.setLegalMoves("bot");
+          setBoard(new Map(chessInstance.getBoard()));
+          setFen(chessInstance.getFen());
+        }
       }
     } catch (e) {
       setAlertMessage(e.message);
     }
-    if (chessGame.getIsCheckmate()) {
-      setAlertMessage('Checkmate!');
-    } else if (chessGame.getIsCheck()) {
-      setAlertMessage('Check!');
-    } else if (chessGame.getIsStalemate()) {
-      setAlertMessage('Stalemate!');
+  };
+
+  const handleSquareClick = (square) => {
+    if (selectedSquare) {
+      if (selectedSquare === square) {
+        setSelectedSquare(null);
+      } else if (chessInstance.isSameColor(selectedSquare, square)) {
+        setSelectedSquare(square);
+      } else if (chessInstance.isLegalMove(selectedSquare, square)) {
+        movePiece(selectedSquare, square);
+        setSelectedSquare(null);
+      } else {
+        setSelectedSquare(null);
+      }
+    } else {
+      if (chessInstance.isTurn(square)) {
+        setSelectedSquare(square);
+      }
     }
-  }, [chessGame]);
+  };
+
+  const onManualFenChange = (newFen) => {
+    try {
+      chessInstance.setFen(newFen);
+      setBoard(new Map(chessInstance.getBoard()));
+      setFen(chessInstance.getFen());
+    } catch (e) {
+      setAlertMessage(e.message);
+    }
+  }
+
+  useEffect(() => {
+    if (chessInstance.getIsCheckmate()) {
+      setAlertMessage('Checkmate!');
+    } else if (chessInstance.getIsStalemate()) {
+      setAlertMessage('Stalemate!');
+    } else if (chessInstance.getIsCheck()) {
+      setAlertMessage('Check!');
+    }
+  }, [board]);
 
   useEffect(() => {
     if (alertMessage) {
       const timer = setTimeout(() => {
         setAlertMessage('');
       }, 3000);
-      return () => clearTimeout(timer); // Clear timeout if component unmounts or alertMessage changes
+      return () => clearTimeout(timer);
     }
   }, [alertMessage]);
 
+  const legalMoves = selectedSquare ? chessInstance.getLegalMoves(selectedSquare) : null;
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="chessboard">
-        {alertMessage && (
-          <div className="alert">
-            {alertMessage}
-          </div>
-        )}
-        <Board board={board} movePiece={movePiece} />
+    <div className="container-chessboard">
+      {alertMessage && (<div className="alert">{alertMessage}</div>)}
+      <div className="container-toggle">
+        <span className="span-bot">Play against computer</span>
+        <PlayAgainstComputer toggleMode={() => chessInstance.toggleMode()} />
       </div>
-    </DndProvider>
+      <Board board={board} onSquareClick={handleSquareClick} selectedSquare={selectedSquare} legalMoves={legalMoves} />
+      <FenInput fen={fen} onManualFenChange={onManualFenChange} />
+    </div>
   );
 };
 

@@ -1,19 +1,24 @@
 # Dev
 services:
   frontend:
+    container_name: frontend
     build:
       context: ./frontend
     volumes:
+      - node_modules:/app/react/node_modules
       - ./frontend/react:/app/react
-      - /app/react/node_modules
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+      - FAST_REFRESH=false
+      - WDS_SOCKET_PORT=3000
     networks:
       - default_network
-
+  
   backend:
+    container_name: backend
     build:
       context: ./backend
     volumes:
@@ -24,6 +29,9 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
     networks:
       - default_network
+
+volumes:
+  node_modules:
 
 networks:
   default_network:

@@ -18,6 +18,7 @@ namespace ChessAPI.Controllers
             }
             catch (Exception e)
             {
+                Console.WriteLine(e.Message);
                 return BadRequest(e.Message);
             }
         }
@@ -30,10 +31,13 @@ namespace ChessAPI.Controllers
                 Chess chess = new(fen);
                 List<string> legalMoves = chess.DoTurn();
                 string newFen = chess.GetFenFromBitboard();
+                // Console.WriteLine(new { fen = newFen, legalMoves });
+
                 return Ok(new { fen = newFen, legalMoves });
             }
             catch (Exception e)
             {
+                Console.WriteLine(e.Message);
                 return BadRequest(e.Message);
             }
         }

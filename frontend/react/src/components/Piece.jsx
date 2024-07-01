@@ -1,5 +1,4 @@
 import React from 'react';
-import { useDrag } from 'react-dnd';
 
 import bb from "../assets/pieces/bb.png";
 import bk from "../assets/pieces/bk.png";
@@ -14,18 +13,7 @@ import wp from "../assets/pieces/wp.png";
 import wq from "../assets/pieces/wq.png";
 import wr from "../assets/pieces/wr.png";
 
-const ItemTypes = {
-  PIECE: 'piece',
-};
-
-const Piece = ({ piece, position }) => {
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: ItemTypes.PIECE,
-    item: { piece, from: position },
-    collect: (monitor) => ({
-      isDragging: !!monitor.isDragging(),
-    }),
-  }), [piece, position]);
+const Piece = ({piece, isLegalMove, isTarget}) => {
 
   let image = null;
   switch (piece) {
@@ -44,8 +32,7 @@ const Piece = ({ piece, position }) => {
     default: break;
   }
 
-  const component = image ? <img ref={drag} src={image} alt="piece" style={{ opacity: isDragging ? 0.5 : 1 }} /> : null;
-  return component;
+  return image ? <img className={isTarget} src={image} /> : <div className={isLegalMove ? 'legal-move' : ''}/>;
 };
 
 export default Piece;

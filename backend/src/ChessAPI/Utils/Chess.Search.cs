@@ -8,10 +8,6 @@ public partial class Chess
 {
     private Move IterativeDeepening()
     {
-        _maxDepth = 6;
-        _timeLimitMillis = 5000;
-
-        // PrintAllFieldsToFile("original");
         Stopwatch stopwatch = new();
         stopwatch.Start();
         bool isMaximizingPlayer = _turn == 'w';
@@ -37,11 +33,6 @@ public partial class Chess
                 _bestMove = _currentBestMove;
         }
         stopwatch.Stop();
-        // SetCoverage(0);
-        // SetCoverage(1);
-        // IsCheck(0);
-        // IsCheck(1);
-        // PrintAllFieldsToFile("final");
 
         Console.WriteLine($"Depth: {_currentDepth}");
         Console.WriteLine($"Possible moves: {_possibleMove}");
@@ -108,7 +99,7 @@ public partial class Chess
         return [.. attacks, .. moves];
     }
 }
-// A simple move representation
+
 public class Move
 {
     public char Piece { get; }

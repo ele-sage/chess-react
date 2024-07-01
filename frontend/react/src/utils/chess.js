@@ -1,31 +1,23 @@
-const SIZE = 8;
 const FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const FEN_PATTERN = /^\s*^(((?:[rnbqkpRNBQKP1-8]+\/){7})[rnbqkpRNBQKP1-8]+)\s([b|w])\s([K|Q|k|q]{1,4}|-)\s([a-h][3|6]|-)\s(\d+)\s(\d+)\s*$/;
-const PIECE = new Map([
-  ['P', 0],
-  ['N', 1],
-  ['B', 2],
-  ['R', 3],
-  ['Q', 4],
-  ['K', 5],
-  ['p', 6],
-  ['n', 7],
-  ['b', 8],
-  ['r', 9],
-  ['q', 10],
-  ['k', 11],
-]);
+
 
 class Chess {
-  constructor(fen = FEN) {
-    this.board = new Map([["a1", 'R'], ["b1", 'N'], ["c1", 'B'], ["d1", 'Q'], ["e1", 'K'], ["f1", 'B'], ["g1", 'N'], ["h1", 'R'],
-                          ["a2", 'P'], ["b2", 'P'], ["c2", 'P'], ["d2", 'P'], ["e2", 'P'], ["f2", 'P'], ["g2", 'P'], ["h2", 'P'],
-                          ["a3", ' '], ["b3", ' '], ["c3", ' '], ["d3", ' '], ["e3", ' '], ["f3", ' '], ["g3", ' '], ["h3", ' '],
-                          ["a4", ' '], ["b4", ' '], ["c4", ' '], ["d4", ' '], ["e4", ' '], ["f4", ' '], ["g4", ' '], ["h4", ' '],
-                          ["a5", ' '], ["b5", ' '], ["c5", ' '], ["d5", ' '], ["e5", ' '], ["f5", ' '], ["g5", ' '], ["h5", ' '],
-                          ["a6", ' '], ["b6", ' '], ["c6", ' '], ["d6", ' '], ["e6", ' '], ["f6", ' '], ["g6", ' '], ["h6", ' '],
+  constructor(fen = FEN, mode = false) {
+    this.board = new Map([["a8", 'r'], ["b8", 'n'], ["c8", 'b'], ["d8", 'q'], ["e8", 'k'], ["f8", 'b'], ["g8", 'n'], ["h8", 'r'],
                           ["a7", 'p'], ["b7", 'p'], ["c7", 'p'], ["d7", 'p'], ["e7", 'p'], ["f7", 'p'], ["g7", 'p'], ["h7", 'p'],
-                          ["a8", 'r'], ["b8", 'n'], ["c8", 'b'], ["d8", 'q'], ["e8", 'k'], ["f8", 'b'], ["g8", 'n'], ["h8", 'r']]);
+                          ["a6", ' '], ["b6", ' '], ["c6", ' '], ["d6", ' '], ["e6", ' '], ["f6", ' '], ["g6", ' '], ["h6", ' '],
+                          ["a5", ' '], ["b5", ' '], ["c5", ' '], ["d5", ' '], ["e5", ' '], ["f5", ' '], ["g5", ' '], ["h5", ' '],
+                          ["a4", ' '], ["b4", ' '], ["c4", ' '], ["d4", ' '], ["e4", ' '], ["f4", ' '], ["g4", ' '], ["h4", ' '],
+                          ["a3", ' '], ["b3", ' '], ["c3", ' '], ["d3", ' '], ["e3", ' '], ["f3", ' '], ["g3", ' '], ["h3", ' '],
+                          ["a2", 'P'], ["b2", 'P'], ["c2", 'P'], ["d2", 'P'], ["e2", 'P'], ["f2", 'P'], ["g2", 'P'], ["h2", 'P'],
+                          ["a1", 'R'], ["b1", 'N'], ["c1", 'B'], ["d1", 'Q'], ["e1", 'K'], ["f1", 'B'], ["g1", 'N'], ["h1", 'R'],]);
+    try {
+      this.isFenValid(fen);
+    } catch (error) {
+      console.error(error.message);
+      this.fen = FEN;
+    }
     this.fen = fen;
     this.turn = 'w';
     this.castle = "KQkq";
@@ -36,30 +28,29 @@ class Chess {
     this.isCheckmate = false;
     this.isStalemate = false;
     this.isCheck = false;
-    this.playingAgainstComputer = false;
-    if (fen !== FEN) this.initializeBoard();
+    if (this.fen !== FEN) this.initializeBoard();
+    this.againstComputer = mode
     this.setLegalMoves();
-    console.log("Constructor called.");
   }
 
-  isFenValid() {
-    if (!FEN_PATTERN.test(this.fen)) {
+  isFenValid(fen) {
+    if (!FEN_PATTERN.test(fen)) {
       throw new Error("FEN does not match the standard format.");
     }
 
     let i = 0, lineLength = 0;
     let kings = [0, 0];
-    while (i < this.fen.length && this.fen[i] !== ' ') {
-      if (this.fen[i] === 'k') kings[0]++;
-      else if (this.fen[i] === 'K') kings[1]++;
-      if (this.fen[i] === '/') {
+    while (i < fen.length && fen[i] !== ' ') {
+      if (fen[i] === 'k') kings[0]++;
+      else if (fen[i] === 'K') kings[1]++;
+      if (fen[i] === '/') {
         if (lineLength !== 8) {
           throw new Error("Each rank must have exactly 8 squares.");
         }
         lineLength = 0;
-      } else if (this.fen[i] >= '1' && this.fen[i] <= '8') {
-        lineLength += parseInt(this.fen[i]);
-      } else if (this.fen[i].match(/[a-zA-Z]/)) {
+      } else if (fen[i] >= '1' && fen[i] <= '8') {
+        lineLength += parseInt(fen[i]);
+      } else if (fen[i].match(/[a-zA-Z]/)) {
         lineLength++;
       } else {
         throw new Error("Invalid character in FEN string.");
@@ -79,10 +70,10 @@ class Chess {
     this.isCheck = false;
     for (let [square, piece] of this.board) {
       if (piece.toLowerCase() === 'k') {
-        const color = this.getPieceColor(piece);
         for (let [from, to] of this.legalMoves) {
           if (to.includes(square)) {
             this.isCheck = true;
+            console.log("Check");
             return;
           }
         }
@@ -90,87 +81,71 @@ class Chess {
     }
   }
 
-  setLegalMoves() {
-    console.log("Setting legal moves.");
+  async setLegalMoves(mode = "legalmoves") {
     const legalMoves = new Map();
-    fetch("http://localhost:5000/api/Chess/legalmoves?fen=" + this.fen)
-      .then(response => response.json())
-      .then(data => {
-        if (data.legalMoves[0] === "Stalemate"){
-          this.isStalemate = true;
-          console.log("Stalemate");
-        } else if (data.legalMoves[0] === "Checkmate") {
-          this.isCheckmate = true;
-          console.log("Checkmate");
-        } else {
-          data.legalMoves.forEach(move => {
-            let [from, to, piece] = move.split(' ');
-            if (!legalMoves.has(from)) {
-              legalMoves.set(from, []);
-            }
-            legalMoves.get(from).push(to);
-          });
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-      });
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/Chess/${mode}?fen=${this.fen}`);
+      const data = await response.json();
+
+      if (this.againstComputer) {
+        this.fen = data.fen;
+        this.initializeBoard();
+      }
+
+      if (data.legalMoves[0] === "Stalemate") {
+        this.isStalemate = true;
+        console.log("Stalemate");
+      } else if (data.legalMoves[0] === "Checkmate") {
+        this.isCheckmate = true;
+        console.log("Checkmate");
+      } else {
+        data.legalMoves.forEach(move => {
+          let [from, to, piece] = move.split(' ');
+          if (!legalMoves.has(from)) {
+            legalMoves.set(from, []);
+          }
+          legalMoves.get(from).push(to);
+        });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
     this.legalMoves = legalMoves;
-    console.log(this.legalMoves);
     this.checkIfCheck();
   }
 
 
   initializeBoard() {
-    let index = 0;
-    let i = 0
+    const fenParts = this.fen.split(' ');
+    const [position, turn, castling, enPassant, halfmove, fullmove] = fenParts;
 
-    this.isFenValid();
-
-    // Board representation
-    for (let row = 8; row >= 1; row--) {
-      for (let col = 'a'; col <= 'h'; col++) {
-        if (this.fen[i] === '/') {
-          i++;
+    this.board.clear();
+    const rows = position.split('/');
+    const files = 'abcdefgh';
+    for (let row = 0; row < rows.length; row++) {
+      let col = 0;
+      for (const char of rows[row]) {
+        if (char >= '1' && char <= '8') {
+          const emptySquares = parseInt(char, 10);
+          for (let i = 0; i < emptySquares; i++) {
+            const square = files[col] + (8 - row);
+            this.board.set(square, ' ');
+            col++;
+          }
+        } else {
+          const square = files[col] + (8 - row);
+          this.board.set(square, char);
+          col++;
         }
-        if (this.fen[i] >= '1' && this.fen[i] <= '8') {
-          index += parseInt(this.fen[i]);
-          i++;
-        }
-        this.board.set(col + row, this.fen[i]);
-        index++;
-        i++;
       }
     }
-    
-    // Active Color
-    this.turn = this.fen[++i];
-  
-    // Castling Rights
-    for (i+=2; this.fen[i] !== ' ' && this.fen[i]; i++)
-      this.castle += this.fen[i];
-  
-    // Possible En Passant Targets
-    for (++i; this.fen[i] !== ' ' && this.fen[i]; i++)
-      this.enPassant += this.fen[i];
-  
-    // Halfmove Clock
-    let halfmove = "";
-    for (++i; this.fen[i] !== ' ' && this.fen[i]; i++)
-      halfmove += this.fen[i];
-    this.halfmove = parseInt(halfmove)
-  
-    // Fullmove Number
-    let fullmove = "";
-    for (++i; this.fen[i] !== ' ' && this.fen[i]; i++)
-      fullmove += this.fen[i];
-    this.fullmove = parseInt(fullmove);
 
-    // Create a map of legal moves for each piece of the active color
-    // Key: piece location, Value: list of legal moves
-    // this.setLegalMoves();
-    // this.updateFen();
-    this.printBoard();
+    this.turn = turn;
+    this.castle = castling;
+    this.enPassant = enPassant;
+    this.halfmove = parseInt(halfmove, 10);
+    this.fullmove = parseInt(fullmove, 10);
   }
 
   updateFen() {
@@ -316,6 +291,27 @@ class Chess {
     return piece === piece.toUpperCase() ? 'w' : 'b';
   }
 
+  isSameColor(from, to) {
+    const pieceFrom = this.board.get(from);
+    const pieceTo = this.board.get(to);
+
+    if (pieceFrom === ' ' ||  pieceTo  === ' ')
+      return false;
+    else if (pieceFrom.charCodeAt(0) < 91  &&  pieceTo.charCodeAt(0) < 91)
+      return true;
+    else if (pieceFrom.charCodeAt(0) > 96  &&  pieceTo.charCodeAt(0) > 96)
+      return true;
+    return false
+  }
+
+  isLegalMove(from, to) {
+    const legal = this.legalMoves.get(from);
+    if (!legal) {
+      return false;
+    }
+    return legal.includes(to);
+  }
+
   getLegalMoves(square) {
     return this.legalMoves.get(square);
   }
@@ -336,13 +332,24 @@ class Chess {
     return this.isCheck;
   }
 
-  setPlayingAgainstComputer(playingAgainstComputer) {
-    this.playingAgainstComputer = playingAgainstComputer;
+  isTurn(squareSelected) {
+    return this.getPieceColor(this.board.get(squareSelected)) === this.turn;
+  }
+
+  toggleMode() {
+    this.againstComputer = !this.againstComputer;
+  }
+
+  isAgainstComputer() {
+    return this.againstComputer;
+  }
+
+  setFen(fen) {
+    this.isFenValid(fen);
+    this.fen = fen;
+    this.initializeBoard();
+    this.setLegalMoves();
   }
 }
-
-// const chess = new Chess("r1bk3r/p2pBpNp/n4n2/1p1NP2P/6P1/3P4/P1P1K3/q5b1");
-// const chess = new Chess("rnbqkbnr/ppp1pppp/4P3/3p4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 3");
-                        //  rnbqkbnr/ppppp1pp/8/5p2/3P4/8/PPP1PPPP/RNBQKBNR w KQkq f6 0 1
 
 export default Chess;

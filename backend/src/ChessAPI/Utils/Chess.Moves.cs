@@ -24,6 +24,10 @@ public partial class Chess
             if (constraint == 0)
                 capture |= diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
         }
+        // else if (constraint == 5 && (PawnAttack[color,0](bitboard) & _fullBitboard[color ^ 1]) != 0)
+        //     capture |= PawnAttack[color,0](bitboard) & _fullBitboard[color ^ 1];
+        // else if (constraint == 7 && (PawnAttack[color,1](bitboard) & _fullBitboard[color ^ 1]) != 0)
+        //     capture |= PawnAttack[color,1](bitboard) & _fullBitboard[color ^ 1];
 
         return [moves, capture];
     }
@@ -81,8 +85,9 @@ public partial class Chess
     {
         if (constraint != 0)
         {
-            if (constraint > 4)
+            if (constraint < 4)
                 return [0UL, 0UL];
+            constraint -= 4;
             return IterDir(bitboard, color, isCoverage, constraint - 1, constraint + 1);
         }
         return IterDir(bitboard, color, isCoverage, 0, 4);
@@ -93,8 +98,9 @@ public partial class Chess
     {
         if (constraint != 0)
         {
-            if (constraint < 4)
+            if (constraint > 4)
                 return [0UL, 0UL];
+            constraint += 4;
             return IterDir(bitboard, color, isCoverage, constraint - 1, constraint + 1);
         }
         return IterDir(bitboard, color, isCoverage, 4, 8);
@@ -103,7 +109,13 @@ public partial class Chess
     private ulong[] GenerateQueenMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         if (constraint != 0)
+        {
+            if (constraint < 4)
+                constraint += 4;
+            else if (constraint > 4)
+                constraint -= 4;
             return IterDir(bitboard, color, isCoverage, constraint - 1, constraint + 1);
+        }
         return IterDir(bitboard, color, isCoverage, 0, 8);
     }
 
@@ -167,7 +179,6 @@ public partial class Chess
             int index = BitOperations.TrailingZeroCount(bit);
             ulong bitboardPiece = 1UL << index;
 
-            // _checkBy[color].Add(bitboardPiece, CheckMask(color, bitboardPiece, direction));
             if (_checkBy[color].ContainsKey(bitboardPiece))
                 _checkBy[color][bitboardPiece] |= CheckMask(color, bitboardPiece, direction);
             else

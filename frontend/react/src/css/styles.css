@@ -6,6 +6,8 @@ body {
   font-family: sans-serif;
   margin: 20px;
   padding: 0;
+  /* dark background */
+  background-color: #242424;
 }
 
 h1 {
@@ -54,10 +56,11 @@ ul {
   visibility: hidden;
 }
 
-.chessboard {
+.container-chessboard {
   display: flex;
-  flex-wrap: wrap;
-  width: 480px;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
 }
 
 .alert {

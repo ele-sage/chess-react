@@ -133,6 +133,8 @@ public partial class Chess
             else
                 index++;
         }
+        if (index != 0)
+            fen += index.ToString();
         string castle = "";
         if (_castle[0,0]) castle += "K";
         if (_castle[0,1]) castle += "Q";
@@ -244,10 +246,8 @@ public partial class Chess
         return legalMoves;
     }
 
-    public List<string> DoTurn(int maxDepth = 6, int maxTime = 500)
+    public List<string> DoTurn()
     {
-        _timeLimitMillis = maxTime;
-        _maxDepth = maxDepth;
         int color = _turn == 'w' ? 0 : 1;
         List<string> legalMoves = [];
 
