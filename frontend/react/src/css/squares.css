@@ -1,14 +1,15 @@
 .chessboard {
   display: grid;
-  grid-template-columns: repeat(8, 60px);
-  grid-template-rows: repeat(8, 60px);
+  grid-template-columns: repeat(8, 80px);
+  grid-template-rows: repeat(8, 80px);
   border: 10px solid #141414;
-  max-width: 500px;
+  max-width: 660px;
 }
 
 .square {
-  width: 60px;
-  height: 60px;
+  position: relative;
+  width: 80px;
+  height: 80px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -39,10 +40,12 @@
 }
 
 .legal-move-enemy {
-  height: 60px;
-  width: 60px;
+  height: 80px;
+  width: 80px;
   border-radius: 40%;
-  display: inline-block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .legal-move-enemy.light {
@@ -51,4 +54,24 @@
 
 .legal-move-enemy.dark {
   background-color: #b58863;
+}
+
+.mark-row, .mark-col {
+  position: absolute;
+  font-size: 12px;
+  color: #333;
+}
+
+.mark-row {
+  bottom: 2px;
+  left: 4px;
+}
+
+.mark-col {
+  top: 2px;
+  right: 2px;
+}
+
+.mark-row.selected, .mark-col.selected {
+  color: #fff;
 }

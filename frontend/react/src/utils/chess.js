@@ -27,10 +27,10 @@ class Chess {
     this.legalMoves = new Map();
     this.isCheckmate = false;
     this.isStalemate = false;
-    this.isCheck = false;
+    this.checkBy = [];
     if (this.fen !== FEN) this.initializeBoard();
     this.againstComputer = mode
-    this.setLegalMoves();
+    // this.setLegalMoves();
   }
 
   isFenValid(fen) {
@@ -66,53 +66,41 @@ class Chess {
     return this.board;
   }
 
-  checkIfCheck() {
-    this.isCheck = false;
-    for (let [square, piece] of this.board) {
-      if (piece.toLowerCase() === 'k') {
-        for (let [from, to] of this.legalMoves) {
-          if (to.includes(square)) {
-            this.isCheck = true;
-            console.log("Check");
-            return;
-          }
-        }
-      }
-    }
-  }
-
   async setLegalMoves(mode = "legalmoves") {
     const legalMoves = new Map();
-    
+    let alertMessage = null;
+
     try {
       const response = await fetch(`http://localhost:5000/api/Chess/${mode}?fen=${this.fen}`);
       const data = await response.json();
+      this.isStalemate = data.stalemate;
+      this.isCheckmate = data.checkmate;
+      this.checkBy = data.checkBy;
 
+      data.legalMoves.forEach(move => {
+        let [from, to, piece] = move.split(' ');
+        if (!legalMoves.has(from)) {
+          legalMoves.set(from, []);
+        }
+        legalMoves.get(from).push(to);
+      });
       if (this.againstComputer) {
         this.fen = data.fen;
         this.initializeBoard();
       }
-
-      if (data.legalMoves[0] === "Stalemate") {
-        this.isStalemate = true;
-        console.log("Stalemate");
-      } else if (data.legalMoves[0] === "Checkmate") {
-        this.isCheckmate = true;
-        console.log("Checkmate");
-      } else {
-        data.legalMoves.forEach(move => {
-          let [from, to, piece] = move.split(' ');
-          if (!legalMoves.has(from)) {
-            legalMoves.set(from, []);
-          }
-          legalMoves.get(from).push(to);
-        });
+      if (this.isCheckmate) {
+        alertMessage = 'Checkmate!';
+      } else if (this.isStalemate) {
+        alertMessage = 'Stalemate!';
+      } else if (this.checkBy.length > 0) {
+        alertMessage = `Check by ${this.checkBy}`;
       }
     } catch (error) {
       console.error('Error:', error);
     }
+
     this.legalMoves = legalMoves;
-    this.checkIfCheck();
+    return alertMessage;
   }
 
 
@@ -320,16 +308,21 @@ class Chess {
     return this.legalMoves;
   }
 
-  getIsStalemate() {
-    return this.isStalemate;
+  setAllLegalMoves(legalMoves) {
+    this.legalMoves = legalMoves;
   }
 
-  getIsCheckmate() {
-    return this.isCheckmate;
-  }
+  gameStateAlert() {
+    console.log(this.checkBy.length);
+    if (this.isCheckmate) {
+      return 'Checkmate!';
+    } else if (this.isStalemate) {
+      return 'Stalemate!';
+    } else if (this.checkBy.length > 0) {
+      return `Check by ${this.checkBy}`;
+    }
 
-  getIsCheck() {
-    return this.isCheck;
+    return null;
   }
 
   isTurn(squareSelected) {
@@ -344,11 +337,10 @@ class Chess {
     return this.againstComputer;
   }
 
-  setFen(fen) {
+  updateGameState(fen) {
     this.isFenValid(fen);
     this.fen = fen;
     this.initializeBoard();
-    this.setLegalMoves();
   }
 }
 

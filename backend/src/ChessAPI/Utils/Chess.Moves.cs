@@ -24,10 +24,10 @@ public partial class Chess
             if (constraint == 0)
                 capture |= diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
         }
-        // else if (constraint == 5 && (PawnAttack[color,0](bitboard) & _fullBitboard[color ^ 1]) != 0)
-        //     capture |= PawnAttack[color,0](bitboard) & _fullBitboard[color ^ 1];
-        // else if (constraint == 7 && (PawnAttack[color,1](bitboard) & _fullBitboard[color ^ 1]) != 0)
-        //     capture |= PawnAttack[color,1](bitboard) & _fullBitboard[color ^ 1];
+        else if (constraint == 5 && (PawnAttack[color,0](bitboard) & _fullBitboard[color ^ 1]) != 0)
+            capture |= PawnAttack[color,0](bitboard) & _fullBitboard[color ^ 1];
+        else if (constraint == 7 && (PawnAttack[color,1](bitboard) & _fullBitboard[color ^ 1]) != 0)
+            capture |= PawnAttack[color,1](bitboard) & _fullBitboard[color ^ 1];
 
         return [moves, capture];
     }
@@ -193,8 +193,12 @@ public partial class Chess
         char[] pieces = color == 0 ? ['K','n','b','r','q'] : ['k','N','B','R','Q'];
     
         ulong knightMoves = KnightMoves(_bitboards[pieces[0]]) & _bitboards[pieces[1]];
-
         SetCheckBy(color, knightMoves, Self);
+
+        // Pawn
+        ulong pawnMoves = (PawnAttack[color,0](_bitboards[pieces[0]]) | PawnAttack[color,1](_bitboards[pieces[0]])) & _bitboards[Pieces[color ^ 1,0]];
+        SetCheckBy(color, pawnMoves, Self);
+
         for (int i = 0; i < 8; i++)
         {
             ulong direction = QueenDirections[i](_bitboards[pieces[0]]);

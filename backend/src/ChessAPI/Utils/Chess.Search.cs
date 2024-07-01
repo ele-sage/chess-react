@@ -63,6 +63,7 @@ public partial class Chess
         _kingPos[color, 1] = kingPos[1];
         _pinnedToKing[color] = PinnedToKing(color, RookDirections) | PinnedToKing(color, BishopDirections);
         SetCoverage(color ^ 1);
+
         IsCheck(color);
         List<Move> moves = [];
         List<Move> attacks = [];

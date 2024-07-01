@@ -224,33 +224,46 @@ public partial class Chess
         return board;
     }
 
-    public List<string> GetPossibleMoves()
+    public GameResponse GetLegalMoves()
     {
         List<string> legalMoves = [];
+        bool checkmate = false;
+        bool stalemate = false;
+        List<string> checkBy = [];
         Move[] moves = GetAllPossibleMoves(_turn);
         if (moves.Length == 0 || moves[0].Piece == '-' || moves[0].Piece == '+')
         {
             if (IsCheck(_turn == 'w' ? 0 : 1))
-                legalMoves.Add("Checkmate");
+                checkmate = true;
             else
-                legalMoves.Add("Stalemate");
-            return legalMoves;
+                stalemate = true;
         }
-        foreach (Move move in moves)
+        else
         {
-            string moveSerialized = $"{BitboardToSquare(move.From)} {BitboardToSquare(move.To)} {move.Piece}";
-            // Console.WriteLine(moveSerialized);
-            legalMoves.Add(moveSerialized);
+            foreach (var check in _checkBy[_turn == 'w' ? 0 : 1])
+            {
+                // Console.WriteLine(BitboardToSquare(check.Key));
+                checkBy.Add(BitboardToSquare(check.Key));
+            }
+            foreach (Move move in moves)
+            {
+                string moveSerialized = $"{BitboardToSquare(move.From)} {BitboardToSquare(move.To)} {move.Piece}";
+                // Console.WriteLine(moveSerialized);
+                legalMoves.Add(moveSerialized);
+            }
         }
-        Console.WriteLine($"Legal Moves: {legalMoves.Count}");
-        return legalMoves;
+
+        return new GameResponse(legalMoves, GetFenFromBitboard(), checkmate, stalemate, checkBy);
     }
 
-    public List<string> DoTurn()
+    public GameResponse GetLegalMovesAfterBot()
     {
         int color = _turn == 'w' ? 0 : 1;
-        List<string> legalMoves = [];
 
+        GameResponse response = GetLegalMoves();
+        if (response.Checkmate || response.Stalemate)
+            return response;
+        
         // execution time
         Stopwatch sw = new();
         sw.Start();
@@ -265,19 +278,14 @@ public partial class Chess
         if (_turn == 'b')
             _fullmove++;
         Console.WriteLine(bestMove);
-        if (bestMove.Piece == '-' )
-            legalMoves.Add("Stalemate");
-        else if (bestMove.Piece == '+' )
-            legalMoves.Add("Checkmate");
         ApplyMove(bestMove);
-        Move[] moves = GetAllPossibleMoves(_turn);
-        Console.WriteLine($"Legal Moves: {moves.Length}");
-        foreach (Move move in moves)
-        {
-            string moveSerialized = $"{BitboardToSquare(move.From)} {BitboardToSquare(move.To)} {move.Piece}";
-            legalMoves.Add(moveSerialized);
-        }
-        return legalMoves;
+        return GetLegalMoves();
     }
 }
+public record GameResponse(
+    List<string> LegalMoves, 
+    string Fen,
+    bool Checkmate,
+    bool Stalemate,
+    List<string> CheckBy);
 }

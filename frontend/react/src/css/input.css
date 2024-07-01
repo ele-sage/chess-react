@@ -37,6 +37,7 @@
   cursor: pointer;
   outline: none;
   margin-left: 0.5rem;
+  font-size: 1rem;
 }
 
 .button-fen:hover {
@@ -45,4 +46,18 @@
 
 .button-fen:active {
   background-color: #0d3200;
+}
+
+.button-fen:disabled {
+  background-color: #bfbfbf;
+  cursor: not-allowed;
+}
+
+.button-fen.prev {
+  font-size: 0.8rem;
+}
+
+.button-fen.next {
+  font-size: 0.8rem;
+  margin-right: auto;
 }

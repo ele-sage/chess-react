@@ -32,7 +32,7 @@ const Piece = ({piece, isLegalMove, isTarget}) => {
     default: break;
   }
 
-  return image ? <img className={isTarget} src={image} /> : <div className={isLegalMove ? 'legal-move' : ''}/>;
+  return image ? <div className={isTarget}><img src={image} /></div> : <div className={isLegalMove ? 'legal-move' : ''}/>;
 };
 
 export default Piece;

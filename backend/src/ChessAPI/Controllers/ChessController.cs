@@ -12,9 +12,9 @@ namespace ChessAPI.Controllers
             try
             {
                 Chess chess = new(fen);
-                List<string> legalMoves = chess.GetPossibleMoves();
-                string newFen = chess.GetFenFromBitboard();
-                return Ok(new { fen = newFen, legalMoves });
+                GameResponse response = chess.GetLegalMoves();
+                Console.WriteLine(response.Fen);
+                return Ok(response);
             }
             catch (Exception e)
             {
@@ -29,11 +29,8 @@ namespace ChessAPI.Controllers
             try
             {
                 Chess chess = new(fen);
-                List<string> legalMoves = chess.DoTurn();
-                string newFen = chess.GetFenFromBitboard();
-                // Console.WriteLine(new { fen = newFen, legalMoves });
-
-                return Ok(new { fen = newFen, legalMoves });
+                GameResponse response = chess.GetLegalMovesAfterBot();
+                return Ok(response);
             }
             catch (Exception e)
             {
