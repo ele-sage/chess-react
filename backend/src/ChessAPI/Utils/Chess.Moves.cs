@@ -1,18 +1,64 @@
 using System.Numerics;
 
+// 8/2p5/3p4/KP5r/QR3p1k/8/4P1P1/8 w - - 0 1
+// 8/2p5/3p4/KP5r/QR2p1kp/8/3P1P2/8 w - - 0 1
+// 8/2p5/K2p4/1P5r/k1p3RQ/8/1P1P4/8 w - - 0 1
+
 namespace ChessAPI
 {
 // Chess.Moves.cs
 public partial class Chess
 {
+    private bool IsEnPassantPinned(ulong fromSquare, int color)
+    {
+        // Determine the captured pawn's position
+        ulong capturedPawnSquare = color == 0 ? _enPassantMask << 8 : _enPassantMask >> 8;
+        bool areAdjacent = (East(fromSquare) & capturedPawnSquare) != 0 || (West(fromSquare) & capturedPawnSquare) != 0;
+        ulong enemyRookQueen = _bitboards[color == 0 ? 'r' : 'R'] | _bitboards[color == 0 ? 'q' : 'Q'];
+
+        //  1. if the pawn (fromSquare) is adjacent to the captured pawn
+        //  2. if king is on the same rank as the pawn that can capture en passant
+        //  3. if there is a enemy rook or queen on that same rank
+        if(!areAdjacent || (RankMasks[_kingPos[color,1]] & fromSquare) == 0 || (enemyRookQueen & RankMasks[_kingPos[color,1]]) == 0)
+            return false;
+
+        // Create a temporary full bitboard without the pawn doing the en passant capture and the captured pawn
+        ulong[] tempFullBitboard = new ulong[2];
+        _fullBitboard.CopyTo(tempFullBitboard, 0);
+        
+        if (color == 0) {
+            tempFullBitboard[0] &= ~fromSquare;
+            tempFullBitboard[1] &= ~capturedPawnSquare;
+        } else {
+            tempFullBitboard[1] &= ~fromSquare;
+            tempFullBitboard[0] &= ~capturedPawnSquare;
+        }
+
+        ulong ray = _bitboards[color == 0 ? 'K' : 'k'];
+        Func<ulong, ulong> direction = fromSquare > ray ? East : West;
+
+        while ((ray = direction(ray)) != 0) {
+            if ((ray & tempFullBitboard[color]) != 0) return false; // Blocked by friendly piece
+            if ((ray & tempFullBitboard[color ^ 1]) != 0) {
+                // Check if it's a rook or queen
+                if ((ray & enemyRookQueen) != 0) {
+                    return true;
+                }
+                return false;
+            }
+        }
+        return false;
+    }
+
     private ulong[] GeneratePawnMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         ulong moves = 0UL;
         ulong capture = 0UL;
+        bool isEnPassantValid = !isCoverage && _enPassantMask != 0 && _turn == (color == 0 ? 'w' : 'b') && !IsEnPassantPinned(bitboard, color);
         if (isCoverage)
         {
             ulong diagonal = PawnAttack[color,0](bitboard) | PawnAttack[color,1](bitboard);
-            _pieceAttack[color] |=  diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
+            _pieceAttack[color] |=  diagonal & (_fullBitboard[color ^ 1] | (isEnPassantValid ? _enPassantMask : 0UL));
             return [diagonal & ~_fullBitboard[color ^ 1], 0UL];
         }
         if (constraint < 2)
@@ -22,7 +68,7 @@ public partial class Chess
             moves = PawnDirection[color](bitboard) & _emptyBitboard;
             moves |= PawnDirection[color](moves) & _emptyBitboard & RankMasks[3 + color];
             if (constraint == 0)
-                capture |= diagonal & (_fullBitboard[color ^ 1] | _enPassantMask);
+                capture |= diagonal & (_fullBitboard[color ^ 1] | (isEnPassantValid ? _enPassantMask : 0UL));
         }
         else if (constraint == 5 && (PawnAttack[color,0](bitboard) & _fullBitboard[color ^ 1]) != 0)
             capture |= PawnAttack[color,0](bitboard) & _fullBitboard[color ^ 1];
@@ -61,7 +107,8 @@ public partial class Chess
                 {
                     moves |= direction & _fullBitboard[color];
                     _pieceAttack[color] |= direction & _fullBitboard[color ^ 1];
-                    direction &= _emptyBitboard;
+                    // If the direction is blocked by a piece and it's the the enemy king
+                    direction &= _emptyBitboard | _bitboards[Pieces[color ^ 1,5]];
                     moves |= direction;
                     direction = QueenDirections[i](direction);
                 }
@@ -122,7 +169,6 @@ public partial class Chess
     private ulong[] GenerateKingMoves(ulong bitboard, int color, bool isCoverage, int constraint)
     {
         ulong kingMoves = North(bitboard) | South(bitboard) | East(bitboard) | West(bitboard) | NorthEast(bitboard) | NorthWest(bitboard) | SouthEast(bitboard) | SouthWest(bitboard);
-        // kingMoves &= (_emptyBitboard | _fullBitboard[color ^ 1]) & ~_pieceCoverage[color ^ 1];
         ulong moves = kingMoves & _emptyBitboard & ~_pieceCoverage[color ^ 1];
         ulong capture = kingMoves & _fullBitboard[color ^ 1] & ~_pieceCoverage[color ^ 1];
 
@@ -166,7 +212,6 @@ public partial class Chess
         do {
             mask |= bitboard;
             bitboard = direction(bitboard);
-            // PrintBitBoard(bitboard);
         } while ((_bitboards[king] & bitboard) == 0);
         return mask;
     }
@@ -195,7 +240,6 @@ public partial class Chess
         ulong knightMoves = KnightMoves(_bitboards[pieces[0]]) & _bitboards[pieces[1]];
         SetCheckBy(color, knightMoves, Self);
 
-        // Pawn
         ulong pawnMoves = (PawnAttack[color,0](_bitboards[pieces[0]]) | PawnAttack[color,1](_bitboards[pieces[0]])) & _bitboards[Pieces[color ^ 1,0]];
         SetCheckBy(color, pawnMoves, Self);
 

@@ -25,7 +25,7 @@ public partial class Chess
     private bool[,]         _castle = {{false,false}, {false,false}};
     private int             _halfmove;
     private int             _fullmove;
-    private int             _timeLimitMillis = 1000;
+    private int             _timeLimitMillis = 3000;
     private int             _maxDepth = 6;
     private int             _currentDepth = 3;
     private Move            _currentBestMove = new('-', 0UL, 0UL);
@@ -35,6 +35,7 @@ public partial class Chess
     private readonly Func<int> _evaluate;
     private Move            _bestMove = new('-', 0UL, 0UL);
     private int             _bestScore = 0;
+    
     public Chess(string fen = Fen)
     {
         IsValidFen(fen);
@@ -126,38 +127,34 @@ public partial class Chess
 
     private ulong PinnedToKing(int color, Func<ulong, ulong>[] directions)
     {
-        char[]  pieceThreat = [(directions == RookDirections ? 'R' : 'B'), 'Q'];
+        char[]  pieceThreat = color == 0 ? [(directions == RookDirections ? 'r' : 'b'), 'q'] : [(directions == RookDirections ? 'R' : 'B'), 'Q'];
         ulong   pinnedPiece = 0UL;
         ulong   pinnedMask = 0UL;
-        
-        if (color == 0)
-            for (int i = 0; i < pieceThreat.Length; i++)
-                pieceThreat[i] = Char.ToLower(pieceThreat[i]);
 
         for (int i = 0; i < 4; i++)
         {
-            ulong direction = directions[i](color == 0 ? _bitboards['K'] : _bitboards['k']);
+            ulong ray = directions[i](color == 0 ? _bitboards['K'] : _bitboards['k']);
 
-            while ((direction & ~_fullBitboard[color ^ 1]) != 0)
+            while ((ray & ~_fullBitboard[color ^ 1]) != 0)
             {
-                if ((direction & _fullBitboard[color]) != 0)
+                if ((ray & _fullBitboard[color]) != 0)
                 {
-                    pinnedPiece = direction;
-                    direction = directions[i](direction);
-                    while ((direction & ~_fullBitboard[color]) != 0)
+                    pinnedPiece = ray;
+                    ray = directions[i](ray);
+                    while ((ray & ~_fullBitboard[color]) != 0)
                     {
-                        if ((direction & (_bitboards[pieceThreat[0]] | _bitboards[pieceThreat[1]])) != 0)
+                        if ((ray & (_bitboards[pieceThreat[0]] | _bitboards[pieceThreat[1]])) != 0)
                         {
                             pinnedMask |= pinnedPiece;
                             break;
                         }
-                        direction &= _emptyBitboard;
-                        direction = directions[i](direction);
+                        ray &= _emptyBitboard;
+                        ray = directions[i](ray);
                     }
                     break;
                 }
-                direction &= _emptyBitboard;
-                direction = directions[i](direction);
+                ray &= _emptyBitboard;
+                ray = directions[i](ray);
             }
         }
         return pinnedMask;
@@ -193,7 +190,7 @@ public partial class Chess
         _pieceCoverage[1] = 0UL;
 
         _pinnedToKing[0] = PinnedToKing(0, RookDirections) | PinnedToKing(0, BishopDirections);
-        _pinnedToKing[1] = PinnedToKing(0, RookDirections) | PinnedToKing(0, BishopDirections);
+        _pinnedToKing[1] = PinnedToKing(1, RookDirections) | PinnedToKing(1, BishopDirections);
         SetCoverage(0, false);
         SetCoverage(1, false);
         SetKingCoverage();

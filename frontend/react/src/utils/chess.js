@@ -206,7 +206,7 @@ class Chess {
     if (this.getPiece(from) === ' ') {
       throw new Error("No piece at the given square.");
     }
-
+    const prevEnPassant = this.enPassant;
     this.enPassant = "-";
     this.halfmove++;
 
@@ -252,8 +252,9 @@ class Chess {
     }
 
     if (this.getPiece(from).toLowerCase() === 'p') {
-      if (to === this.enPassant) {
+      if (to === prevEnPassant) {
         this.setPiece(to[0] + (this.turn === 'w' ? '5' : '4'), ' ');
+        this.setPiece(to, this.getPiece(from));
       } else if (to[1] === '1' || to[1] === '8') {
         this.setPiece(to, this.turn === 'w' ? 'Q' : 'q');
       } else {
