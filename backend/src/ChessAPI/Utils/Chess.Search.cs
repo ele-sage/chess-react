@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Numerics;
 
 namespace ChessAPI
@@ -6,38 +5,7 @@ namespace ChessAPI
 // Chess.Evaluate.cs
 public partial class Chess
 {
-    private Move IterativeDeepening()
-    {
-        Stopwatch stopwatch = new();
-        stopwatch.Start();
-        bool isMaximizingPlayer = _turn == 'w';
 
-        for (int depth = 3; depth <= _maxDepth; depth++)
-        {
-            _currentDepth = depth;
-            AlphaBeta(depth, int.MinValue, int.MaxValue, isMaximizingPlayer, stopwatch);
-
-            if (stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
-                break;
-            _bestMove = _currentBestMove;
-            _bestScore = _currentBestScore;
-        }
-        if (isMaximizingPlayer)
-        {
-            if (_currentBestScore > _bestScore)
-                _bestMove = _currentBestMove;
-        }
-        else
-        {
-            if (_currentBestScore < _bestScore)
-                _bestMove = _currentBestMove;
-        }
-        stopwatch.Stop();
-
-        Console.WriteLine($"Depth: {_currentDepth}");
-        Console.WriteLine($"Possible moves: {_possibleMove}");
-        return _bestMove;
-    }
 
     private Move[] GetMoves(ulong from, ulong moves, char piece)
     {

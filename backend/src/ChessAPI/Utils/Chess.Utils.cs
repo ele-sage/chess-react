@@ -267,7 +267,8 @@ public partial class Chess
         // execution time
         Stopwatch sw = new();
         sw.Start();
-        Move bestMove = IterativeDeepening();
+        // Move bestMove = IterativeDeepening(8);
+        var (bestMove, searchCompleted) = GetBestMove(8);
 
         sw.Stop();
         Console.WriteLine($"Execution Time: {sw.ElapsedMilliseconds}ms");
@@ -277,9 +278,10 @@ public partial class Chess
             _halfmove++;
         if (_turn == 'b')
             _fullmove++;
-        Console.WriteLine(bestMove);
+
         ApplyMove(bestMove);
-        return GetLegalMoves();
+        response = GetLegalMoves();
+        return response;
     }
 }
 public record GameResponse(

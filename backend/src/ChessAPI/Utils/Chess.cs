@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace ChessAPI
 {
@@ -25,16 +26,10 @@ public partial class Chess
     private bool[,]         _castle = {{false,false}, {false,false}};
     private int             _halfmove;
     private int             _fullmove;
-    private int             _timeLimitMillis = 3000;
-    private int             _maxDepth = 6;
-    private int             _currentDepth = 3;
-    private Move            _currentBestMove = new('-', 0UL, 0UL);
-    private int             _currentBestScore = 0;
     private readonly Dictionary<char, Func<ulong, int, bool, int, ulong[]>> _moveGenerators;
     // Evaluate function that will be used to evaluate the board state
-    private readonly Func<int> _evaluate;
-    private Move            _bestMove = new('-', 0UL, 0UL);
-    private int             _bestScore = 0;
+    private Stopwatch       _stopwatch = new();
+    private int             _timeLimit = 300000;
     
     public Chess(string fen = Fen)
     {
@@ -58,8 +53,6 @@ public partial class Chess
         _emptyBitboard = ~(_fullBitboard[0] | _fullBitboard[1]);
         SetKingPos();
         InitCoverage();
-        // _evaluate = _turn == 'w' ? Evaluate : PeSTO_Eval;
-        _evaluate = Evaluate;
     }
 
     private void InitializeBoard()

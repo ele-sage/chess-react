@@ -3,9 +3,9 @@ namespace ChessAPI
 // Chess.Evaluate.cs
 public class ChessConstants
 {
-    public static int[] mg_value = { 82, 337, 365, 477, 1025, 0 };
-    public static int[] eg_value = { 94, 281, 297, 512, 936, 0 };
-    public static int[] gamephaseInc = { 0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0 };
+    public static int[] mg_value = [82, 337, 365, 477, 1025, 0];
+    public static int[] eg_value = [94, 281, 297, 512, 936, 0];
+    public static int[] gamephaseInc = [0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0];
 
     public static int[,] mg_table = new int[12, 64];
     public static int[,] eg_table = new int[12, 64];

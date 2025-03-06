@@ -8,161 +8,234 @@ public partial class Chess
 {
     private int PeSTO_Eval()
     {
-        int[] mg = new int[2];
-        int[] eg = new int[2];
+        int mg_score = 0;
+        int eg_score = 0;
         int gamePhase = 0;
+        int c = _turn == 'w' ? 0 : 1;
         
+        // Calculate material and position scores for both middlegame and endgame
         for (int color = 0; color < 2; color++)
         {
             for (int i = 0; i < 6; i++)
             {
                 char piece = Pieces[color, i];
                 ulong bitboard = _bitboards[piece];
+                
                 while (bitboard != 0)
                 {
                     ulong piecePos = bitboard & ~(bitboard - 1);
                     int pieceIndex = BitOperations.TrailingZeroCount(piecePos);
-                    if ((_pieceCoverage[color ^ 1] & (1UL << pieceIndex)) != 0)
-                    {
-                        mg[color] += ChessConstants.mg_table[i + color * 6, pieceIndex] * 2 / 3;
-                        eg[color] += ChessConstants.eg_table[i + color * 6, pieceIndex] * 2 / 3;
-                    }
-                    else
-                    {
-                        mg[color] += ChessConstants.mg_table[i + color * 6, pieceIndex];
-                        eg[color] += ChessConstants.eg_table[i + color * 6, pieceIndex];
-                    }
-                    gamePhase += ChessConstants.gamephaseInc[i + color * 6];
+                    
+                    // Add phase increment for this piece (except pawns and kings)
+                    int pieceType = i + color * 6;
+                    gamePhase += ChessConstants.gamephaseInc[pieceType];
+                    
+                    // Add position scores for middlegame and endgame
+                    int tableIndex = color == 0 ? pieceIndex : 63 - pieceIndex;
+                    int factor = color == c ? 1 : -1;
+                    
+                    mg_score += factor * ChessConstants.mg_table[pieceType, tableIndex];
+                    eg_score += factor * ChessConstants.eg_table[pieceType, tableIndex];
+                    
                     bitboard &= bitboard - 1;
                 }
             }
         }
-        _possibleMove++;
-        int c = _turn == 'w' ? 0 : 1;
-        int mgScore = mg[c] - mg[c ^ 1];
-        int egScore = eg[c] - eg[c ^ 1];
-        int mgPhase = gamePhase;
-        if (mgPhase > 24)
-            mgPhase = 24;
-        int egPhase = 24 - mgPhase;
-
-        int score = (mgScore * mgPhase + egScore * egPhase) / 24;
-        return _turn == 'w' ? score : -score;
+        
+        // Determine the phase of the game (0 = middlegame, 24 = endgame)
+        const int totalPhase = 24; // Maximum possible game phase value
+        gamePhase = Math.Min(gamePhase, totalPhase);
+        
+        // Interpolate between middlegame and endgame scores
+        int phase = (gamePhase * 256 + (totalPhase / 2)) / totalPhase;
+        int finalScore = ((mg_score * (256 - phase)) + (eg_score * phase)) / 256;
+        
+        return finalScore;
     }
-
 
     private int Evaluate()
     {
         int score = 0;
-        for (int i = 0; i < 6; i++)
+        int c = _turn == 'w' ? 0 : 1;
+        
+        // Material evaluation
+        for (int color = 0; color < 2; color++)
         {
-            char piece = Pieces[0, i];
-            ulong bitboard = _bitboards[piece];
-            while (bitboard != 0)
+            for (int i = 0; i < 6; i++)
             {
-                ulong piecePos = bitboard & ~(bitboard - 1);
-                int pieceIndex = BitOperations.TrailingZeroCount(piecePos);
-                int pieceValue = PieceValues[i];
-
-                score += pieceValue + PieceSquareTables[i][pieceIndex];
-                bitboard &= bitboard - 1;
+                char piece = Pieces[color, i];
+                ulong bitboard = _bitboards[piece];
+                
+                while (bitboard != 0)
+                {
+                    ulong piecePos = bitboard & ~(bitboard - 1);
+                    int pieceIndex = BitOperations.TrailingZeroCount(piecePos);
+                    
+                    // Add material value
+                    score += (color == c ? 1 : -1) * PieceValues[i];
+                    
+                    // Add position bonus
+                    int tableIndex = color == 0 ? pieceIndex : 63 - pieceIndex;
+                    score += (color == c ? 1 : -1) * PieceSquareTables[i][tableIndex] / 10;
+                    
+                    bitboard &= bitboard - 1;
+                }
             }
         }
-        for (int i = 0; i < 6; i++)
-        {
-            char piece = Pieces[1, i];
-            ulong bitboard = _bitboards[piece];
-            while (bitboard != 0)
-            {
-                ulong piecePos = bitboard & ~(bitboard - 1);
-                int pieceIndex = BitOperations.TrailingZeroCount(piecePos);
-                int pieceValue = PieceValues[i];
-                if ((_pieceCoverage[0] & (1UL << pieceIndex)) != 0)
-                    pieceValue = pieceValue * 2 / 3;
-                score -= pieceValue + PieceSquareTables[i][63 - pieceIndex];
-                bitboard &= bitboard - 1;
-            }
-        }
-        _possibleMove++;
+        
         return score;
     }
 
-    private int AlphaBeta(int depth, int alpha, int beta, bool isMaximizingPlayer, Stopwatch stopwatch)
+    private int AlphaBeta(int depth, int alpha, int beta)
     {
-        if (depth == 0 || stopwatch.ElapsedMilliseconds >= _timeLimitMillis)
-            return _evaluate();
+        _possibleMove++;
+        if (depth == 0)
+            return Evaluate();
+            // return PeSTO_Eval();
+        
         ulong hash = ComputeHash();
         if (_transpositionTable.TryGetValue(hash, out var entry) && entry.depth >= depth)
         {
             if (entry.flag == TranspositionTable.EXACT)
                 return entry.value;
-            if (entry.flag == TranspositionTable.LOWERBOUND)
-                alpha = Math.Max(alpha, entry.value);
-            else
-                beta = Math.Min(beta, entry.value);
-
+            else if (entry.flag == TranspositionTable.LOWERBOUND && entry.value > alpha)
+                alpha = entry.value;
+            else if (entry.flag == TranspositionTable.UPPERBOUND && entry.value < beta)
+                beta = entry.value;
+            
             if (alpha >= beta)
                 return entry.value;
         }
-
+        
         int color = _turn == 'w' ? 0 : 1;
-
         Move[] moves = GetAllPossibleMoves(_turn);
+        
         if (moves.Length == 0)
         {
-            if (_checkBy[color].Count == 0)
-                return 0; // Stalemate
-            else
-                return isMaximizingPlayer ? int.MinValue : int.MaxValue; // Checkmate
-        }
+            int score;
+            if (_checkBy[color].Count == 0) // Stalemate
+                score = 0;
+            else // Checkmate - adjust based on depth so immediate checkmates are valued higher
+                score = -10000 + depth; 
 
-        int bestScore = isMaximizingPlayer ? int.MinValue : int.MaxValue;
+            _transpositionTable.Store(hash, depth, score, TranspositionTable.EXACT);
+            return score;
+        }
+        
+        // Save board state
         ulong enPassantMask = _enPassantMask;
         ulong[] fullBitboard = [_fullBitboard[0], _fullBitboard[1]];
-
         bool[,] castle = {{ _castle[0, 0], _castle[0, 1] }, { _castle[1, 0], _castle[1, 1] }};
         int[,] kingPos = {{ _kingPos[0, 0], _kingPos[0, 1] }, { _kingPos[1, 0], _kingPos[1, 1] }};
         ulong pinnedToKing = _pinnedToKing[color];
-
-
+        
+        int bestScore = int.MinValue;
+        Move? bestMove = null;
+        int alphaOrig = alpha;
+        
         foreach (Move move in moves)
         {
             ApplyMove(move);
-            int score = AlphaBeta(depth - 1, alpha, beta, !isMaximizingPlayer, stopwatch);
+            int score = -AlphaBeta(depth - 1, -beta, -alpha);
             UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing);
-            if (isMaximizingPlayer)
+            
+            if (score > bestScore)
             {
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    if (depth == _currentDepth)
-                    {
-                        _currentBestMove = move;
-                        _currentBestScore = bestScore;
-                    }
-                }
-                alpha = Math.Max(alpha, bestScore);
+                bestScore = score;
+                bestMove = move;
+                
+                if (score > alpha)
+                    alpha = score;
+                    
+                if (alpha >= beta)
+                    break; // Beta cutoff
             }
-            else
-            {
-                if (score < bestScore)
-                {
-                    bestScore = score;
-                    if (depth == _currentDepth)
-                    {
-                        _currentBestMove = move;
-                        _currentBestScore = bestScore;
-                    }
-                }
-                beta = Math.Min(beta, bestScore);
-            }
-
-            if (alpha >= beta)
-                break;
         }
-        _transpositionTable.Store(hash, depth, bestScore, bestScore <= alpha ? TranspositionTable.UPPERBOUND : (bestScore >= beta ? TranspositionTable.LOWERBOUND : TranspositionTable.EXACT));
-        return bestScore;
 
+        int flag;
+        if (bestScore <= alphaOrig)
+            flag = TranspositionTable.UPPERBOUND;
+        else if (bestScore >= beta)
+            flag = TranspositionTable.LOWERBOUND;
+        else
+            flag = TranspositionTable.EXACT;
+            
+
+        _transpositionTable.Store(hash, depth, bestScore, flag, bestMove);
+        
+        return bestScore;
+    }
+    private (Move?, bool) GetBestMove(int depth)
+    {
+        Move? bestMove = null;
+        int alpha = int.MinValue + 1; // Avoid using exact int.MinValue
+        int beta = int.MaxValue;
+        int color = _turn == 'w' ? 0 : 1;
+        Move[] moves = GetAllPossibleMoves(_turn);
+
+        ulong enPassantMask = _enPassantMask;
+        ulong[] fullBitboard = [_fullBitboard[0], _fullBitboard[1]];
+        bool[,] castle = {{ _castle[0, 0], _castle[0, 1] }, { _castle[1, 0], _castle[1, 1] }};
+        int[,] kingPos = {{ _kingPos[0, 0], _kingPos[0, 1] }, { _kingPos[1, 0], _kingPos[1, 1] }};
+        ulong pinnedToKing = _pinnedToKing[color];
+        
+        int bestScore = int.MinValue + 1;
+        ulong hash = ComputeHash();
+        
+        foreach (Move move in moves)
+        {
+            if (_stopwatch.ElapsedMilliseconds > _timeLimit)
+                return (bestMove, false);
+
+            ApplyMove(move);
+            int score = -AlphaBeta(depth - 1, -beta, -alpha);
+            UndoMove(move, enPassantMask, fullBitboard, castle, kingPos, pinnedToKing);
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestMove = move;
+                
+                if (score > alpha)
+                    alpha = score;
+            }
+        }
+        _transpositionTable.Store(hash, depth, bestScore, TranspositionTable.EXACT, bestMove);
+    
+        Console.WriteLine($"Total number of moves considered: {_possibleMove}");
+        Console.WriteLine($"Best move score: {bestScore}");
+        Console.WriteLine($"Best move: {bestMove}");
+        return (bestMove ?? new Move('-', 0, 0), true);
+    }
+
+    private Move IterativeDeepening(int maxDepth)
+    {
+        Move? bestMove = null;
+        _stopwatch.Reset();
+        _stopwatch.Start();
+        
+        for (int depth = 4; depth <= maxDepth; depth++)
+        {
+            Console.WriteLine($"Searching depth {depth}...");
+
+            if (_stopwatch.ElapsedMilliseconds > _timeLimit * 0.8) // Use 80% of time limit as cutoff
+                break;
+                
+            var (currentBestMove, searchCompleted) = GetBestMove(depth);
+            
+            if (searchCompleted && currentBestMove != null && currentBestMove.Piece != '-')
+            {
+                bestMove = currentBestMove;
+            }
+            else if (!searchCompleted)
+            {
+                // Use previous best move
+                break;
+            }
+        }
+        
+        _stopwatch.Stop();
+        return bestMove ?? new Move('-', 0, 0);
     }
 
     private void ApplyMove(Move move)
@@ -240,7 +313,7 @@ public partial class Chess
         _turn = _turn == 'w' ? 'b' : 'w';
     }
 
-    private void UndoMove(Move move, ulong enPassantMask, ulong[] fullBitboard, bool[,] castle, int[,] kingPos, ulong pinnedToKing, bool setMoves = false)
+    private void UndoMove(Move move, ulong enPassantMask, ulong[] fullBitboard, bool[,] castle, int[,] kingPos, ulong pinnedToKing)
     {
         _turn = _turn == 'w' ? 'b' : 'w';
         int color = _turn == 'w' ? 0 : 1;
@@ -289,12 +362,6 @@ public partial class Chess
         _kingPos[1, 0] = kingPos[1,0];
         _kingPos[1, 1] = kingPos[1,1];
         _pinnedToKing[color] = pinnedToKing;
-        if (setMoves)
-        {
-            SetCoverage(color ^ 1);
-            SetCoverage(color);
-            IsCheck(color);
-        }
     }
 }
 }
