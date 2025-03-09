@@ -1,5 +1,5 @@
 # Use the .NET SDK image for development
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dev
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS dev
 
 WORKDIR /app
 
@@ -12,4 +12,4 @@ COPY src/ChessAPI/. .
 
 EXPOSE 5000
 
-CMD ["dotnet", "watch", "run", "--urls", "http://0.0.0.0:5000"]
+CMD ["dotnet", "watch", "run"]

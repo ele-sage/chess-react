@@ -10,7 +10,8 @@ public partial class Chess
         if (depth == 0) return 1;
 
         long nodes = 0;
-        Move[] moves = GetAllPossibleMoves(_turn);
+        var (attacks, otherMoves) = GetAllPossibleMoves(_turn);
+        Move[] moves = [.. attacks, .. otherMoves];
 
         foreach (var move in moves)
         {
@@ -39,7 +40,8 @@ public partial class Chess
             Directory.CreateDirectory(directoryPath);
         }
         File.WriteAllText($"{directoryPath}/myPerft.txt", "");
-        Move[] moves = GetAllPossibleMoves(_turn);
+        var (attacks, otherMoves) = GetAllPossibleMoves(_turn);
+        Move[] moves = [.. attacks, .. otherMoves];
         long totalNodes = 0;
         foreach (var move in moves)
         {

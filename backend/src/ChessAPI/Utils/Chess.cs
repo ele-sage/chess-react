@@ -27,12 +27,13 @@ public partial class Chess
     private int             _halfmove;
     private int             _fullmove;
     private readonly Dictionary<char, Func<ulong, int, bool, int, ulong[]>> _moveGenerators;
-    // Evaluate function that will be used to evaluate the board state
     private Stopwatch       _stopwatch = new();
-    private int             _timeLimit = 300000;
+    private int             _timeLimit;
+    private readonly Func<int> _evaluate;
     
-    public Chess(string fen = Fen)
+    public Chess(string fen = Fen, int timeLimit = 3000)
     {
+        InitializePeSTO();
         IsValidFen(fen);
         _moveGenerators = new Dictionary<char, Func<ulong, int, bool, int, ulong[]>>
         {
@@ -53,6 +54,8 @@ public partial class Chess
         _emptyBitboard = ~(_fullBitboard[0] | _fullBitboard[1]);
         SetKingPos();
         InitCoverage();
+        _timeLimit = timeLimit;
+        _evaluate = _turn == 'w' ? Evaluate : EvaluatePeSTO;
     }
 
     private void InitializeBoard()

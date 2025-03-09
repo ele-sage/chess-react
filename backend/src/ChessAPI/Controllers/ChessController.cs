@@ -25,12 +25,28 @@ namespace ChessAPI.Controllers
         }
 
         [HttpGet("bot")]
-        public ActionResult GetBot([FromQuery] string fen = "")
+        public ActionResult GetBot([FromQuery] string fen = "", [FromQuery] int searchTime = 1000)
+        {
+            try
+            {
+                Chess chess = new(fen, searchTime);
+                BotResponse response = chess.GetLegalMovesAfterBot();
+                return Ok(response);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return BadRequest(e.Message);
+            }
+        }
+
+        [HttpGet("move")]
+        public ActionResult GetMove([FromQuery] string fen = "", [FromQuery] string move = "")
         {
             try
             {
                 Chess chess = new(fen);
-                GameResponse response = chess.GetLegalMovesAfterBot();
+                GameResponse response = chess.MakeMove(move);
                 return Ok(response);
             }
             catch (Exception e)

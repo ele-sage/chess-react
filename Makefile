@@ -22,4 +22,3 @@ backend:
 	docker exec -it chess-backend-1 bash
 
 .PHONY: start stop prune frontend backend
-# dotnet add package Swashbuckle.AspNetCore

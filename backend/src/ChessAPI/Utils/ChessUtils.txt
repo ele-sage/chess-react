@@ -35,3 +35,13 @@ rn2kbnr/1p3ppp/p2p4/2pKpP2/4P3/2Nq4/PP2b1PP/R1B2BNR w kq - 0 11 check mate
 Ordering (Search if in list of moves there is a previous best move, if so place it first).
 Move format change from class to u16,u32 or u64?
 
+
+
+
+
+
+
+
+8/p1p2p1k/1p1p4/1P2n3/P1PP4/2K2rP1/3B4/8 w - - 1 2
+
+8/P4kp1/5p2/4pP2/5K2/8/r6R/1q6 w - e6 0 46

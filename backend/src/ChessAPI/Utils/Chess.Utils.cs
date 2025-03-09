@@ -8,8 +8,7 @@ public partial class Chess
 {
     private void PrintAllFieldsToFile(string path)
     {
-        using (StreamWriter sw = new(path))
-        {
+            using StreamWriter sw = new(path);
             sw.WriteLine("Board:");
             sw.WriteLine(GetBoard());
             foreach (var bitboard in _bitboards)
@@ -29,15 +28,14 @@ public partial class Chess
                     sw.WriteLine($"{checkBy.Key}: {checkBy.Value}");
             }
             sw.WriteLine("\nKing Position:");
-            sw.WriteLine($"White: {_kingPos[0,0]}, {_kingPos[0,1]}\nBlack: {_kingPos[1,0]}, {_kingPos[1,1]}");
+            sw.WriteLine($"White: {_kingPos[0, 0]}, {_kingPos[0, 1]}\nBlack: {_kingPos[1, 0]}, {_kingPos[1, 1]}");
             sw.WriteLine("\nEmpty Bitboard:");
             sw.WriteLine(_emptyBitboard);
             sw.WriteLine("\nEn Passant Mask:");
             sw.WriteLine(_enPassantMask);
             sw.WriteLine("\nCastle:");
-            sw.WriteLine($"White: {_castle[0,0]}, {_castle[0,1]}\nBlack: {_castle[1,0]}, {_castle[1,1]}");
+            sw.WriteLine($"White: {_castle[0, 0]}, {_castle[0, 1]}\nBlack: {_castle[1, 0]}, {_castle[1, 1]}");
         }
-    }
 
     private void SetFullBitboard(int color)
     {
@@ -223,71 +221,6 @@ public partial class Chess
         board += "  a b c d e f g h\n";
         return board;
     }
-
-    public GameResponse GetLegalMoves()
-    {
-        List<string> legalMoves = [];
-        bool checkmate = false;
-        bool stalemate = false;
-        List<string> checkBy = [];
-        Move[] moves = GetAllPossibleMoves(_turn);
-        if (moves.Length == 0 || moves[0].Piece == '-' || moves[0].Piece == '+')
-        {
-            if (IsCheck(_turn == 'w' ? 0 : 1))
-                checkmate = true;
-            else
-                stalemate = true;
-        }
-        else
-        {
-            foreach (var check in _checkBy[_turn == 'w' ? 0 : 1])
-            {
-                // Console.WriteLine(BitboardToSquare(check.Key));
-                checkBy.Add(BitboardToSquare(check.Key));
-            }
-            foreach (Move move in moves)
-            {
-                string moveSerialized = $"{BitboardToSquare(move.From)} {BitboardToSquare(move.To)} {move.Piece}";
-                // Console.WriteLine(moveSerialized);
-                legalMoves.Add(moveSerialized);
-            }
-        }
-
-        return new GameResponse(legalMoves, GetFenFromBitboard(), checkmate, stalemate, checkBy);
-    }
-
-    public GameResponse GetLegalMovesAfterBot()
-    {
-        int color = _turn == 'w' ? 0 : 1;
-
-        GameResponse response = GetLegalMoves();
-        if (response.Checkmate || response.Stalemate)
-            return response;
-        
-        // execution time
-        Stopwatch sw = new();
-        sw.Start();
-        // Move bestMove = IterativeDeepening(8);
-        var (bestMove, searchCompleted) = GetBestMove(8);
-
-        sw.Stop();
-        Console.WriteLine($"Execution Time: {sw.ElapsedMilliseconds}ms");
-        if (bestMove.Piece == 'P' || bestMove.Piece == 'p' || (bestMove.To & (_fullBitboard[color ^ 1] | _enPassantMask)) != 0)
-            _halfmove = 0;
-        else
-            _halfmove++;
-        if (_turn == 'b')
-            _fullmove++;
-
-        ApplyMove(bestMove);
-        response = GetLegalMoves();
-        return response;
-    }
 }
-public record GameResponse(
-    List<string> LegalMoves, 
-    string Fen,
-    bool Checkmate,
-    bool Stalemate,
-    List<string> CheckBy);
 }
+
